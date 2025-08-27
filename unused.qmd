@@ -1,0 +1,515 @@
+---
+title: "trash"
+format: html
+editor: visual
+---
+
+###OSM
+
+OSM = OpenStreet Map it uses Overpass which is an online API. If someone mapped Talek borders in OSM over the years, I will be able to extract it yearly. After doing this function, it says that there are no boundaries for Talek, so I will just extract satellite imagery for each year and then draw my own polygons over talek town using pixels with buildings and stuff
+
+```{r}
+
+#install.packages("osmdata")
+#install.packages("osmextract")
+
+library(osmdata)
+library(osmextract)
+
+```
+
+```{r}
+# Install needed packages (run once)
+#install.packages(c("httr2", "jsonlite"))
+
+library(httr2)
+library(sf)
+library(jsonlite)
+
+get_talek_border <- function(year) {
+  date_str <- sprintf('%d-06-30T00:00:00Z', year)
+  
+  query <- sprintf(
+    '[out:json][timeout:60][date:"%s"];
+    relation["name"="Talek"]["boundary"="administrative"];
+    out geom;',
+    date_str
+  )
+  
+  resp <- request("https://overpass-api.de/api/interpreter") |>
+    req_body_raw(charToRaw(query)) |>
+    req_perform()
+  
+  content_txt <- resp_body_string(resp)
+  content_json <- fromJSON(content_txt, simplifyVector = FALSE)
+  
+  if (length(content_json$elements) == 0) {
+    message("No boundary found for Talek in ", year)
+    return(NULL)
+  }
+  
+  # Build polygon
+  coords_list <- lapply(content_json$elements[[1]]$geometry, function(pt) c(pt$lon, pt$lat))
+  coords_mat <- do.call(rbind, coords_list)
+  poly <- st_polygon(list(coords_mat))
+  sfobj <- st_sf(year = year, geometry = st_sfc(poly, crs = 4326))
+  return(sfobj)
+}
+
+# Test
+talek_2020 <- get_talek_border(2020)
+print(talek_2020)
+
+```
+
+##2.4. Yearly KDE
+
+```{r Calculating}
+
+CD_cy_KDE <- lapply(CD_KDE_list_cy, calculate_kde_2)
+
+
+# To remove the NULL element : 
+CD_cy_KDE <- CD_cy_KDE[!sapply(CD_cy_KDE, is.null)]
+
+
+```
+
+To make maps with the KDE now:
+
+```{r Extract+Data manip}
+
+# extracting the KDE
+CD_KDE_yearly <- lapply(CD_cy_KDE, extract_kde_sf)
+
+# to R bind all the list from the extract function
+CD_KDE_yearly_data <- do.call(rbind, CD_KDE_yearly)
+
+
+CD_KDE_yearly_map <- tibble::rownames_to_column(CD_KDE_yearly_data, "year")
+
+```
+
+```{r Leaflet map}
+
+# Add points grouped by Year
+KDE_years <- unique(CD_KDE_yearly_map$year)
+
+CD_yearly_KDE <- CD_leaflet_inter
+
+
+for (yr in KDE_years) {
+  KDE_year_data <- CD_KDE_yearly_map |> filter(year == yr)
+  
+CD_yearly_KDE <- CD_yearly_KDE |>
+  addPolygons(data = KDE_year_data,
+              color = "red",
+              fillColor = "none",
+              group = yr,
+              weight = 2,
+              fillOpacity = 0.05)
+}
+
+
+CD_yearly_KDE <- CD_yearly_KDE |>
+  addLayersControl(
+    baseGroups = KDE_years,
+    overlayGroups = c("Year"),
+    options = layersControlOptions(collapsed = FALSE))
+  
+
+CD_yearly_KDE
+
+
+
+
+```
+
+```{r spsample function}
+#With MCPs
+#spsample is used with sp object, to sample random points from a spatial object
+rp_clans_MCPs <- spsample(clan_MCPs, n=1000, "random")
+plot(rp_clans_MCPs)
+
+
+# With KDEs
+#st_sample is the same as spsample, but we use it with sf object, like the KDEs previously calculated are sf objects.
+rp_clans_KDE <- st_sample(CD_clan_KDE, size = 1000, type ="random")
+
+plot(rp_clans_KDE)
+```
+
+```{r}
+# with MCPs
+rp_MCPs_plot <- MCPs_plot |>
+  addCircleMarkers(data = rp_clans_MCPs,
+                   color = "red",
+                   radius = 1,
+                   fillOpacity = 0.1)
+
+rp_MCPs_plot
+```
+
+```{r}
+#trying to troubleshoot the 18 extra rows.
+
+#anti_join() is used to compare 2 datasets and finding the rows that differ 
+extra_rows <- anti_join(RSF_data, rp_ind_clans_KDE, by = colnames(rp_ind_clans_KDE)[1:4])
+
+hz_essai_RSFdata <- RSF_data |>
+  filter(case_ == "TRUE") |>
+  filter(clan == "happyzebra")
+
+hz_essai_presencetrack <- presence_track |>
+  filter(clan == "happyzebra")
+
+# Full join both datasets based on the first 4 columns
+merged_df <- full_join(hz_essai_presencetrack, hz_essai_RSFdata, by = colnames(hz_essai_presencetrack)[1:4])
+
+
+```
+
+# Conda bullshit...
+
+```{r}
+# Tell reticulate where to install miniconda
+#Sys.setenv(RETICULATE_MINICONDA_PATH = "C:/r-miniconda")
+
+#force python.exe path into c:/r-miniconda
+#use_python("C:/r-miniconda/python.exe", required = TRUE)
+
+#see python configuration
+```
+
+To make a r-reticulate environment
+
+```{r}
+#to tell R where conda.exe is:
+#conda <- "C:/r-miniconda/Scripts/conda.exe"
+
+# to create dedicated conda environment for R-Python work
+#conda_create("r-reticulate", packages = "python", conda = conda)
+```
+
+```{r}
+#use_condaenv("r-reticulate", required = TRUE)
+
+```
+
+```{r}
+# Install earthengine-api into that env
+#conda_install(envname = "r-reticulate", packages = "earthengine-api", pip = TRUE, conda = conda)
+
+```
+
+numpy:
+
+```{r}
+reticulate::py_install("numpy", envname = "r-reticulate", method = "conda")
+```
+
+Setting up a google earth engine project first:
+
+Installing mini_conda:
+
+```{r}
+library(reticulate)
+
+reticulate::conda_install(envname = "rgee", packages = "earthengine-api=0.1.370", channel = "conda-forge", python_version = "3.9")
+
+#Tell R to use the right python in the right environment 
+use_condaenv("r-reticulate", 
+             conda = "C:/r-miniconda/Scripts/conda.exe", 
+             required = TRUE)
+
+# to see the python configuration and make sure all is good 
+py_config()
+
+#make sure we have earth engine installed and all
+py_module_available("ee")
+#TRUE
+```
+
+```{r}
+
+#install.packages("rgee")
+library(rgee)
+
+Sys.setenv(EARTHENGINE_CREDENTIALS = file.path(Sys.getenv("CONDA_PREFIX"), ".config/earthengine/credentials"))
+
+#ee_install_set_pyenv(py_env = "YOUR_ENV", py_path = "C:/r-miniconda/envs/r-reticulate/python.exe")
+
+#copying my credentials :
+#file.copy(
+#  from = "C:/Users/Anne Ju Laberge/.config/earthengine/credentials",
+#  to   = "C:/r-miniconda/envs/r-reticulate/.config/earthengine/credentials",
+#  overwrite = TRUE)
+
+
+```
+
+```{r}
+#initialize earth engine so that it is linked to my google cloud account in the right project 
+ee_Initialize(user = 'anneju.laberge21@gmail.com', drive = TRUE, project = 'ee-annejulaberge21')
+
+ee_Initialize()
+
+ee_clean_user_credentials()
+ee_Authenticate()
+
+#rgee::ee_install_upgrade()
+
+ee_check_credentials()
+ee_check()
+
+```
+
+```{r}
+# to see where the credentials are stored:
+ee_get_earthengine_path()
+
+
+```
+
+```{r}
+
+
+#in cmd:
+#C:\Users\Anne Ju Laberge\rgee-env\Scripts\activate"
+
+# Point to the exact Python binary in your working env
+use_python("C:/Users/Anne Ju Laberge/rgee-env/Scripts/python.exe", required = TRUE)
+
+
+ee_Initialize(user = 'anneju.laberge21@gmail.com', drive = TRUE, project = 'ee-annejulaberge21')
+```
+
+```{r}
+#check credentials, all look ok
+ee_check_credentials()
+
+# Now we make sure that all Earth engine python packages are installed
+ee_check()
+ee_check_python_packages()
+
+```
+
+### rstac
+
+connect to STAC APIs (like Microsoft Planetary Computer) and download imagery locally.
+
+This was not working, I used the rgee package instead...
+
+```{r}
+library(rstac)
+library(terra)
+library(sf)
+
+```
+
+Step1: define Talek region:
+
+```{r}
+# Talek town borders : 
+talek_bbox <- c(35.0, -1.42, 35.05, -1.39) 
+# xmin, ymin, xmax, ymax
+talek_bbox
+```
+
+Step2: Connect to a STAC endpoint:
+
+```{r}
+stac_url <- "https://planetarycomputer.microsoft.com/api/stac/v1"
+s <- stac(stac_url)
+```
+
+Step3: Search for one year of Sentinel-2 imagery
+
+```{r}
+search_res <- s |>
+  stac_search(
+    collections = "sentinel-2-l2a",
+    bbox = talek_bbox,
+    datetime = "2020-01-01/2020-12-31",
+    limit = 10
+  ) |>
+  get_request()
+```
+
+Step4: Get asset URLs and download
+
+```{r}
+
+items <- items_fetch(search_res)
+assets <- assets_select(items, asset_names = "visual") # true color composite
+
+asset_urls <- assets_url(assets)
+#Download first image
+stac_download(
+  assets,
+  output_dir = "talek_images",   # creates folder if missing
+  overwrite = TRUE
+)
+```
+
+Step5: View & digitize
+
+```{r}
+img <- rast("talek_2020.tif")
+plotRGB(img, r = 1, g = 2, b = 3, stretch = "lin")
+
+```
+
+
+##i) Prey abundance
+
+Will use the Prey census data. We have 2 prey transects per month. Maybe we can do that per month, and just count the total number of preys per month. That would give us an estimate of the monthly abundance of prey, which is good because prey abundance does vary according to season, which in our case is represented by the month.
+
+```{r Prey census data}
+str(tblPreyCensus)
+
+#transforming all the prey columns as numeric
+prey_data <- tblPreyCensus |>
+  mutate_at(vars(9: 39), as.numeric)
+
+str(prey_data)
+unique(prey_data$region)
+```
+
+Now we want to keep months and the total number of preys per the month.
+
+```{r PREY_dat}
+
+prey_data_sum <- prey_data |>
+  #Create a column with the sum of all the prey columns (9 - 27 are preys)
+  mutate(prey = rowSums(prey_data[9:27])) |>
+  mutate(lstock = rowSums(prey_data[38:39])) |>
+  # keeping only the talek clans
+  filter(region == "Narok") |>
+  #adding a month columns
+  mutate(month = month(date)) |>
+  #adding a year column
+  mutate(year = year(date)) |>
+  #keeping only year >=1988
+  filter(year >= 1988) |>
+  #now we can get rid of all the prey columns 
+  select(-c(4:8, 9:36, 38, 39))
+
+#now we want to create a new dataset with monthly prey abundance
+#So we want to group by year and transect
+PREY_dat <- prey_data_sum |>
+  arrange(year, month) |>
+  group_by(year, month, clan, transect) |>
+  summarise(prey_abun = sum(prey), 
+            lstock_abun = sum(lstock)) |>
+  ungroup()
+
+
+PREY_dat$year <- as.character(PREY_dat$year)
+PREY_dat$month <- as.numeric(PREY_dat$month)
+
+
+```
+
+Visualisation
+
+```{r Plot per year}
+
+#the total amount for all the years combined 
+PREY_plot_year <- 
+  ggplot(aes(x=transect, y=prey_abun), data = PREY_dat) +
+  geom_col(fill = "#F8766D", width = 0.6) +
+  labs(x = "Transect", y = "Prey abundance") +
+  facet_wrap(~month) +
+  theme_bw() +
+  theme(legend.position = "none")
+
+PREY_plot_year
+
+
+# if we select specific years
+PREY_plot <- PREY_dat |>
+  #Choose a year
+  filter(year == 2022) |>
+  
+  #Now plot: 
+  ggplot(aes(x=transect, y=prey_abun)) +
+  geom_col(aes(fill = as.factor(month)), width = 0.6) +
+  labs(x = "Transect", y = "Prey abundance") +
+  facet_wrap(~month) +
+  theme_bw() + 
+  theme(legend.position = "none")
+  
+
+PREY_plot
+
+
+
+```
+
+```{r Plot all}
+
+#I will combine all transect together...
+PREY_dat_all <- PREY_dat |>
+  group_by(year, month) |>
+  summarise(prey_abun_tot = sum(prey_abun),
+            lstock_abun_tot = sum (lstock_abun)) |>
+  ungroup()
+
+# now we plot:
+PREY_plot_all <- 
+  ggplot(aes(x=year, y=prey_abun_tot), data = PREY_dat_all) +
+  geom_col(aes(fill = as.factor(month)), width = 0.6) +
+  labs(x = "Year", y = "Prey abundance") +
+  facet_wrap(~month) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.8, hjust=0.7, size = 7), 
+        legend.position = "none")
+
+PREY_plot_all
+
+```
+
+Combine the datasets
+
+```{r Merge DB}
+
+CD_data_prey <- merge(CD_for_map, PREY_dat_all, by = c("month", "year")) 
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

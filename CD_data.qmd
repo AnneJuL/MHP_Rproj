@@ -1,0 +1,1019 @@
+---
+output: html_document
+title: "MHP Special Project - Data prep"
+author: "Anne Ju Laberge"
+date: "2025"
+format:
+  html:
+    
+    code-fold: true
+    output-fold: true
+    code-tools: true
+    code-link: true
+    code-summary: "Show the code"
+    theme: cosmo
+    embed-resources: true
+    self-contained: true
+    toc-depth: 5
+    toc: true
+    toc-float: true
+editor: visual
+editor_options:
+   
+   chunk_output_type: console
+execute:
+  warning: false
+  error: true
+---
+
+#0. Data
+
+Installing the package to have access to the MHP data (Just for the first time).
+
+```{r For MHP data}
+
+#install.packages("usethis")
+
+#library(usethis)
+#usethis::create_github_token() # to create a Token
+
+#gitcreds::gitcreds_set()
+
+#devtools::install_github("MaraHyenaProject/hyenadata", auth_token = gh::gh_token())
+
+```
+
+Load packages:
+
+```{r Packages}
+
+#install.packages("rgee")
+
+
+# for data manipulations
+library(readr) # load data
+library(dplyr) # data manip
+
+library(hyenadata) # MHP hyena data
+
+library(tidyr) # # for data manip
+library(ggplot2) # data visualization and graphs
+library(stringr) 
+library(lubridate) # to create my year column and month one
+library(ggspatial) # to make easy maps with ggplot
+library(basemaps) # for basemap function 
+library(tidyverse)
+
+#to make maps and plotting:
+library(sf) 
+library(mapview)
+library(leaflet)
+library(leaflet.extras)
+library(amt)
+
+
+#from Guélat
+library(leaflet.extras2)
+library(terra) #to work with raster data
+library(lwgeom)
+library(spatstat.random)
+library(spdep)
+library(httr2)
+library(tmap)
+library(tmaptools)
+library(classInt)
+library(leafsync)
+library(qgisprocess)
+
+
+# for more stuff 
+library(dbscan)
+library(openrouteservice)
+library(geosphere)
+library(magrittr)
+
+
+# For rgee stuff:
+library(geojsonio)
+library(magick)
+
+library(flextable)
+
+```
+
+```{r Load MHP tables}
+#load all tables:
+load_all_tables <- function(){
+  data(list = data(package = 'hyenadata')$results[,3], package = 'hyenadata')
+}
+
+load_all_tables()
+
+```
+
+#1. Create db
+
+I will be using the tblLandmarks to identified CDs' locations (GPS points). Maybe also tblSessions/tblLocationsPerSession to ID sessions at communal dens and then have the location with the time/year.
+
+```{r Location data}
+str(tblLandmarks)
+
+CD_loc_data <- tblLandmarks |>
+  subset(category == "cd" | category == "d") |>
+  subset(region == "talek" | region == "serena") |>
+  filter(landmark_id != "Car Park Den") |> # This coordinate is the same as utme, this is wrong... also wrong in the raw data... will have to look on the GPS itself
+  select(landmark_id, utme, utmn, date) |>
+  drop_na(utme, utmn)
+
+#write_csv2(CD_loc_data, "data_files/CD_loc_data.csv")
+CD_loc_data_date <- CD_loc_data |>
+  separate(date, c("date1", "date2"), sep = " ", remove=FALSE) |>
+  separate(date2, c("year", "month", "day"), sep = "-", remove = F) |>
+  separate(date1, c("month1", "day1", "year1"), sep = "/", remove = F)
+
+```
+
+I gave up... The date column was too messed up so I exported it into a csv file, added the year column by hand and now I just reimport it here:
+
+```{r Location data}
+CD_loc_data <- read.csv2("data_files/CD_loc_data.csv")
+
+CD_loc_data <- CD_loc_data |>
+  select(-date)
+
+```
+
+```{r Session+Location data}
+
+Sess_data <- tblSessions |>
+  select(clan, session) |>
+  subset(str_detect(clan, "talek") | str_detect(clan, "serena") | str_detect(clan, "happy.zebra"))
+
+CD_SessLoc_data <- tblLocationsPerSession |>
+  subset(str_detect(landmark_id, "den") | str_detect(landmark_id, "Den"))
+
+CD_data <- merge(Sess_data, CD_SessLoc_data, by = "session")
+
+```
+
+Great, now I have all my Den sessions in Talek. I need to fill the utme and utmn columns so all of them of a specific locations. I can try to do that with my CD_loc_data database created earlier here.
+
+I want to match the landmark_id columns in both database and when it does, to add the utme and utmn values in the corresponding columns.
+
+```{r Full DB}
+
+CD_sess_data <- CD_data |>
+  select(-c(3:5, 7:11))
+
+# merge the utme and utmn columns
+CD_data_full <- merge(CD_sess_data, CD_loc_data, by = "landmark_id")
+
+str(CD_data_full)
+
+```
+
+```{r DB for mapping}
+
+# First we need to turn the coordinates into numeric values
+# here all the weird coordinates (the ones with multiple numbers that doesn't make sense) are transformed to NAs
+CD_data_full$utme <- as.numeric(CD_data_full$utme)
+CD_data_full$utmn <- as.numeric(CD_data_full$utmn)
+
+
+#Just keeping the coordinates for the map
+CD_for_map <- CD_data_full |>
+  select(utme, utmn, landmark_id, clan, year) |>
+  #create year column
+  #mutate(year = year(date)) |> no need anymore
+  
+  # Getting rid of any year prior to the study time frame
+  filter(year >= "1988") |> 
+  
+  #changing talek.w into talek
+  mutate(clan = str_replace_all(clan, "talek.w", "talek")) |>
+  
+  #Add a month column
+  #mutate(month = month(date)) |> not gonna do that anymore
+  
+  #Put "_" in the landmark_id columns
+  mutate(landmark_id = str_replace_all(landmark_id, " ", "_")) |>
+  #Keep only 1 distinct coordinates per den name
+  distinct(landmark_id, year, .keep_all = T) |>
+  
+  #Getting rid of utmn coordinate with more or less than 7 numbers
+  mutate(utmn = ifelse(nchar(as.character(utmn)) == 7, utmn, NA)) |>
+  #Getting rid of utme coordinate with more or less than 7 numbers
+  mutate(utme = ifelse(nchar(as.character(utme)) == 6, utme, NA)) |>
+# for these two, we will change that eventuallly but for now we get rid of them
+  
+  #Getting rid of NAs
+  drop_na(utme, utmn) |>
+  filter(utme != 0)
+
+CD_for_map$year <- as.character(CD_for_map$year)
+
+str(CD_for_map)
+
+```
+
+
+#2. Shapefiles
+
+SHP file contains geometrical information (for example shape type and coordinates). DBF file contains additional attribute information (for example name or temperature)
+
+We use St_as_sf() function from sf package to create an sf object directly from a data frame containing a column of type sfc (simple feature list-column). Here, the utme and utmn are coordinates and so can be transformed into an sfc column.
+
+You can also create and sf object with st_sf, where you will have a sfc object stored in an r object and then its attributes and you can combien them into an sf object : "pts_sf \<- st_sf(pts_data, geometry = pts)" where pts = sfc of coordinates pts_data = attributes
+
+```{r shp in UTM}
+# Turning the points into coordinates to put in a map
+
+#Convert the dataframe into a sf object:
+sf_df <- st_as_sf(CD_for_map, coords = c("utme", "utmn"), crs = 32736) #EPSG code is 32736, UTM Zone 36 South
+
+
+#Save the sf dataframe - can only do it once when it is not created before
+CD_sf <- sf::st_write(sf_df, "data_files/CD_sf.shp")
+
+CD_sf <- sf::st_read("data_files/CD_sf.shp")
+CD_sf
+```
+
+Now, CD_sf is a sf object because we have the feature geometrics (POINTS here) with their related attributes (year, landmark_id, clan, etc.).
+
+```{r}
+
+str(CD_sf)
+# our sf object is a list of POINTS
+
+# To extract the specific item of the list of points
+CD_sf$geometry[[2]] # give: POINT (717702 9849474)
+
+class(CD_sf$geometry[[2]]) # give : [1] "XY"    "POINT" "sfg"  
+
+#To change the name of the "geometry column": (don'T use names() function, but st_geometry)
+#st_geometry(CD_sf) <- "Den_location"
+
+```
+
+Also, to use leaflet (to make maps), we need to change the UTM coordinates into long lat : Here we transform the CD_sf into a WGS84 to use it with leaflet.
+
+```{r shp in WGS84}
+
+CD_sf_wgs84 <- st_transform(CD_sf, crs = 4326)
+#4326 is the EPSG code for the WGS84 system, which uses degrees of latitude and longitude.
+
+# save the lat long data points into a shapefile 
+CD_sf_wgs84 <- sf::st_write(CD_sf_wgs84, "data_files/CD_sf_wgs84.shp")
+
+#to read the shape file just created
+CD_sf_wgs84 <- sf::st_read("data_files/CD_sf_wgs84.shp")
+CD_sf_wgs84
+
+#verify it's working:
+head(st_coordinates(CD_sf_wgs84))
+```
+
+
+```{r Data manip}
+
+#change the clan column values: we want 1 word per clan 
+# Also, here we take out 3 dens that have GPS location not in the right territory
+
+CD_sf <- CD_sf |>
+  mutate(clan = str_replace_all(clan, "\\.", "")) |>
+  filter(lndmrk_ != "Migration_Den") |>
+  filter(lndmrk_ != "Runway_Den") |>
+  filter(lndmrk_ != "Mausoleun_at_Halicarnassus_Den")
+
+
+CD_sf_wgs84 <- CD_sf_wgs84 |>
+  mutate(clan = str_replace_all(clan, "\\.", "")) |>
+  filter(lndmrk_ != "Migration_Den") |>
+  filter(lndmrk_ != "Runway_Den") |>
+  filter(lndmrk_ != "Mausoleun_at_Halicarnassus_Den")
+
+```
+
+
+
+##1.1. All GPS locations 
+
+```{r}
+
+
+
+```
+
+
+
+
+#3. Covariables
+
+Now we need to create covariables.
+
+We have a lot of covariables to create. Here is the list:
+
+-   Distance to human community\*
+
+-   Distance to last and closest lion sighting\*
+
+-   Distance/number (don't think we have that) of cattle\*
+
+-   Number of cubs at dens
+
+-   Land cover (bush vs plains, etc.)\*
+
+-   Altitude\*
+
+-   Distance to edge of territory\*
+
+-   Distance to water\*
+
+-   Amount of time (maybe in number of days?) that the den was used (in interaction with distance to humans?
+
+-   Rank of the females at the den
+
+Easily done/accessible:
+
+-   Season/Month of year
+
+-   Prey abundance
+
+```{r}
+
+```
+
+
+##i) Distance to Talek
+
+The first thing is to tell R to use python to be able to get the 20+ year historical satellite imagery data from Google Earth Engine, since it is the easiest way to get the Talek town borders for all those years. That API (Application Programming Interface) is only available in Python or JavaScript. So I have to tell R to use Python to have access to that.
+  --> An API is like a menu at a restaurant - it lists the things you can ask for (functions, data) and tells the kitchen (the software) how to prepare them for you.
+  --> Google Earth Engine API = the set of commands you can send to Google's satellite image servers to request data (e.g., "give me all Landsat images for Talek Town in 2005").
+
+
+### rgee
+
+Setting up a google earth engine project first.
+
+The first time I need to install conda, create the rgee environment within the conda thing. 
+
+I followed the steps here to have it finally worked: https://gis.stackexchange.com/questions/473730/authentification-error-when-installing-rgee-in-rstudio?newreg=3674f3f594ee4f91856aa2e5df5b204d
+
+Here are the lines that needed to be run the first time, but now I don't need them anymore, just the ones in the code box.
+
+- install_packages("rgee")
+- reticulate::conda_install(envname = "rgee", packages = "earthengine-api=0.1.370", channel = "conda-forge", python_version = "3.9")
+
+```{r}
+#to get rgeeExtra, to use things like the gif animation
+#remotes::install_github("r-earthengine/rgeeExtra")
+
+```
+
+
+```{r}
+library(reticulate)
+
+#This is to tell R to use the right Python environment
+reticulate::use_condaenv("rgee", required = TRUE)
+
+library(rgee)
+library(rgeeExtra)
+
+#Initialize EE 
+ee_Initialize()
+#important to initialize earth engine without the user and project argument here:
+
+```
+
+### Checking 
+The ee_check() function will help you for checking the sanity of your rgee installation and dependencies.
+
+- ee_check_python() - Python version
+- ee_check_credentials() - Google Drive and GCS credentials
+- ee_check_python_packages() - Python packages
+
+```{r}
+ee_check()
+
+ee_check_python()
+ee_check_credentials()
+ee_check_python_packages()
+```
+
+
+
+### Tests
+```{r}
+
+# test to make sure all is running smoothly:
+ee$Image("CGIAR/SRTM90_V4")$getInfo()
+ee$String('Hello from the Earth Engine servers!')$getInfo()
+
+```
+
+
+#### Night time lights
+From : https://github.com/r-spatial/rgee
+To Compute the trend of night-time lights
+
+Let's create a new band containing the image date as years since 1991 by extracting the year of the image acquisition date and subtracting it from 1991.
+```{r}
+
+createTimeBand <-function(img) {
+  year <- ee$Date(img$get('system:time_start'))$get('year')$subtract(1991L) 
+  ee$Image(year)$byte()$addBands(img)
+}
+
+#Use your TimeBand function to map it over the night-time lights collection.
+
+collection <- ee$
+  ImageCollection('NOAA/DMSP-OLS/NIGHTTIME_LIGHTS')$
+  select('stable_lights')$
+  map(createTimeBand)
+
+# Compute a linear fit over the series of values at each pixel, so that you can visualize the y-intercept as green, and the positive/negative slopes as red/blue.
+col_reduce <- collection$reduce(ee$Reducer$linearFit())
+col_reduce <- col_reduce$addBands(
+  col_reduce$select('scale'))
+ee_print(col_reduce)
+
+# to visualize the map: 
+Map$setCenter(9.08203, 47.39835, 3)
+Map$addLayer(
+  eeObject = col_reduce,
+  visParams = list(
+    bands = c("scale", "offset", "scale"),
+    min = 0,
+    max = c(0.18, 20, -0.18)
+  ),
+  name = "stable lights trend"
+)
+
+```
+
+
+#### Worldwide elevation map
+From: https://cran.r-project.org/web/packages/rgee/vignettes/rgee01.html
+
+SRTM (Shuttle Radar Topography Mission) elevation values worldwide:
+```{r}
+
+#create a ee object
+srtm <- ee$Image("USGS/SRTMGL1_003")
+
+#Define visualization parameters
+viz <- list(
+  max = 4000,
+  min = 0,
+  palette = c("#000000","#5AAD5A","#A9AD84","#FFFFFF"))
+
+# using Map$addLayer to visualize the map interactively
+Map$addLayer(
+  eeObject = srtm,
+  visParams =  viz,
+  name = 'SRTM')
+
+```
+
+
+#### Precipitation
+From: https://github.com/r-spatial/rgee
+
+To play with some precipitation data: 
+
+nc = North Carolina counties, 100 simple features with 14 attributes
+```{r}
+# to read the nc shapefile:
+nc <- st_read(system.file("shape/nc.shp", package = "sf"), quiet = TRUE)
+
+plot(nc)
+
+# will use the Terraclimate database
+terraclimate <- ee$ImageCollection("IDAHO_EPSCOR/TERRACLIMATE") %>%
+  ee$ImageCollection$filterDate("2001-01-01", "2002-01-01") %>%
+  ee$ImageCollection$map(function(x) x$select("pr")) %>% # Select only precipitation bands
+  ee$ImageCollection$toBands() %>% # from imagecollection to image
+  ee$Image$rename(sprintf("PP_%02d",1:12)) # rename the bands of an image
+
+# to extract monthly precipitation:
+ee_nc_rain <- ee_extract(x = terraclimate, y = nc["NAME"], sf = FALSE)
+
+```
+
+ee_extract will help you to extract monthly precipitation values from the Terraclimate ImageCollection. ee_extract works similar to raster::extract, you just need to define: the ImageCollection object (x), the geometry (y), and a function to summarize the values (fun).
+
+```{r}
+# then we visualize it using ggplot:
+ee_nc_rain %>%
+  pivot_longer(-NAME, names_to = "month", values_to = "pr") %>%
+  mutate(month, month=gsub("PP_", "", month)) %>%
+  ggplot(aes(x = month, y = pr, group = NAME, color = pr)) +
+  geom_line(alpha = 0.4) +
+  xlab("Month") +
+  ylab("Precipitation (mm)") +
+  theme_minimal()
+```
+
+#### NDVI animation
+
+From: https://github.com/r-spatial/rgee
+
+To create a NDVI animation map (Peru's Arequepia region)
+ 
+```{r}
+
+#Define the regional bounds of animation frames and a mask to clip the NDVI data by.
+mask <- system.file("shp/arequipa.shp", package = "rgee") %>%
+  st_read(quiet = TRUE) %>%
+  sf_as_ee()
+region <- mask$geometry()$bounds()
+
+
+#Retrieve the MODIS Terra Vegetation Indices 16-Day Global 1km dataset as an ee.ImageCollection and then, select the NDVI band.
+
+col <- ee$ImageCollection('MODIS/006/MOD13A2')$select('NDVI')
+
+#Group images by composite date
+col <- col$map(function(img) {
+  doy <- ee$Date(img$get('system:time_start'))$getRelative('day', 'year')
+  img$set('doy', doy)
+})
+distinctDOY <- col$filterDate('2013-01-01', '2014-01-01')
+
+```
+
+Now, let's define a filter that identifies which images from the complete collection match the DOY from the distinct DOY collection.
+```{r}
+filter <- ee$Filter$equals(leftField = 'doy', rightField = 'doy')
+
+```
+Define a join and convert the resulting FeatureCollection to an ImageCollection... it will take you only 2 lines of code!
+
+```{r}
+join <- ee$Join$saveAll('doy_matches')
+joinCol <- ee$ImageCollection(join$apply(distinctDOY, col, filter))
+```
+
+Apply median reduction among the matching DOY collections.
+
+```{r}
+comp <- joinCol$map(function(img) {
+  doyCol = ee$ImageCollection$fromImages(
+    img$get('doy_matches')
+  )
+  doyCol$reduce(ee$Reducer$median())
+})
+
+#define RGB visualization parameters first.
+visParams = list(
+  min = 0.0,
+  max = 9000.0,
+  bands = "NDVI_median",
+  palette = c(
+    'FFFFFF', 'CE7E45', 'DF923D', 'F1B555', 'FCD163', '99B718', '74A901',
+    '66A000', '529400', '3E8601', '207401', '056201', '004C00', '023B01',
+    '012E01', '011D01', '011301'
+  )
+)
+
+#Create RGB visualization images for use as animation frames.
+rgbVis <- comp$map(function(img) {
+  do.call(img$visualize, visParams) %>%
+    ee$Image$clip(mask)
+})
+
+
+#GIF visualization parameters.
+gifParams <- list(
+  region = region,
+  dimensions = 600,
+  crs = 'EPSG:3857',
+  framesPerSecond = 10
+)
+
+# get month names: 
+dates_modis_mabbr <- distinctDOY %>%
+  ee_get_date_ic %>% # Get Image Collection dates
+  '[['("time_start") %>% # Select time_start column
+  lubridate::month() %>% # Get the month component of the datetime
+  '['(month.abb, .) # subset around month abbreviations
+```
+
+Finally, we use ee_utils_gif_* functions to render the GIF animation and add some texts.
+```{r}
+
+animation <- ee_utils_gif_creator(rgbVis, gifParams, mode = "wb")
+animation %>%
+  ee_utils_gif_annotate(
+    text = "NDVI: MODIS/006/MOD13A2",
+    size = 15, color = "white",
+    location = "+10+10"
+  ) %>%
+  ee_utils_gif_annotate(
+    text = dates_modis_mabbr,
+    size = 30,
+    location = "+290+350",
+    color = "white",
+    font = "arial",
+    boxcolor = "#000000"
+  ) # -> animation_wtxt
+
+#to save it
+# ee_utils_gif_save(animation_wtxt, path = "raster_as_ee.gif")
+
+```
+
+
+
+### TALEK 
+```{r}
+# 1. Location of Talek town, Maasai Mara
+talek_point <- ee$Geometry$Point(35.216423, -1.442912) #talek town center
+talek_roi <- talek_point$buffer(600) # 5 km radius
+```
+
+Here is a test for year 2020:
+```{r}
+# 2 - Function for built-up detection
+get_yearly_builtup <- function(year) {
+  s2 <- ee$ImageCollection("COPERNICUS/S2_SR")$
+    filterBounds(talek_roi)$
+    filterDate(sprintf("%d-01-01", year), sprintf("%d-12-31", year))$
+    filter(ee$Filter$lt("CLOUDY_PIXEL_PERCENTAGE", 20))$
+    median()
+  
+  # Calculate NDBI (built-up) and NDVI (vegetation)
+  ndbi <- s2$normalizedDifference(c("B11", "B8"))
+  ndvi <- s2$normalizedDifference(c("B8", "B4"))
+  
+  # Threshold: built-up AND low vegetation
+  builtup_mask <- ndbi$gt(0.2)$And(ndvi$lt(0.3))
+  
+  # Mask original image
+  builtup <- builtup_mask$selfMask()
+  
+  # Reduce to vectors inside ROI
+  vectors <- builtup$reduceToVectors(
+    geometry = talek_roi,
+    geometryType = "polygon",
+    reducer = ee$Reducer$countEvery(),
+    scale = 10,
+    maxPixels = 1e10
+  )
+  
+  vectors$set("year", year)
+}
+
+# --- Year of interest ---
+year <- 2020
+
+# --- Generate polygons for that year ---
+builtup_polygons <- get_yearly_builtup(year)
+
+# --- Visualization parameters ---
+Map$centerObject(talek_roi, zoom = 15)
+Map$addLayer(talek_roi, list(color = "blue"), "Talek ROI") +
+  Map$addLayer(builtup_polygons, list(color = "red"), paste("Built-up", year))
+
+
+```
+
+
+
+
+```{r}
+# 2. Function to mask clouds and detect buildings
+mask_builtup <- function(image) {
+  # Calculate NDBI
+  swir <- image$select("B11")
+  nir <- image$select("B8")
+  ndbi <- swir$subtract(nir)$divide(swir$add(nir))
+  
+  # Built-up mask (adjust threshold if needed)
+  builtup_mask <- ndbi$gt(0.2) # try lowering to 0.1 if empty
+  
+  # Apply mask but keep it as a single-band image for vectorizing
+  return(builtup_mask$rename("builtup"))
+}
+
+# 3. Function to get yearly composite and vector polygons
+get_yearly_builtup <- function(year) {
+  start <- sprintf("%d-01-01", year)
+  end <- sprintf("%d-12-31", year)
+  
+  yearly_img <- ee$ImageCollection("COPERNICUS/S2_SR")$
+    filterBounds(region)$
+    filterDate(start, end)$
+    map(mask_builtup)$
+    max() # union of all built-up pixels in the year
+  
+  # Ensure projection
+  yearly_img <- yearly_img$setDefaultProjection("EPSG:4326", NULL, 10)
+  
+  # Vectorize built-up areas
+  vectors <- yearly_img$reduceToVectors(
+    geometry = region,
+    geometryType = "polygon",
+    scale = 10,
+    crs = "EPSG:4326",
+    maxPixels = 1e10
+  )
+  
+  vectors_sf <- ee_as_sf(vectors)
+  vectors_sf$year <- year
+  return(vectors_sf)
+}
+
+# 4. Run for a range of years
+years <- 2021:2023
+builtup_polygons <- do.call(rbind, lapply(years, get_yearly_builtup))
+
+# 5. Save shapefile
+st_write(builtup_polygons, "talek_builtup_yearly.shp", delete_dsn = TRUE)
+```
+
+
+
+### Distances from Talek
+
+```{r}
+
+talek_center <- data.frame(
+  lon = 35.216423,
+  lat = -1.442912
+)
+
+#Convert to sf object
+talek_sf <- st_as_sf(talek_center, coords = c("lon", "lat"), crs = 4326)
+
+# Transform to a projected CRS in meters (UTM zone for this area: 36S)
+CD_sf_m <- st_transform(CD_sf, 32736)    # EPSG 32736 = WGS 84 / UTM zone 36S
+talek_sf_m <- st_transform(talek_sf, 32736)
+
+# Calculate distances in meters
+CD_for_map$dist_talek_m <- as.numeric(st_distance(CD_sf_m, talek_sf_m))
+
+```
+
+Saving it :
+```{r}
+
+sf_df_m_to_talek <- st_as_sf(CD_for_map, coords = c("utme", "utmn"), crs = 32736) 
+#Save the sf dataframe - can only do it once when it is not created before
+CD_sf2 <- sf::st_write(sf_df_m_to_talek, "data_files/CD_sf_talekm.shp")
+
+CD_sf2 <- sf::st_read("data_files/CD_sf_talekm.shp")
+
+
+```
+
+
+
+##ii) Lions
+
+This variable is gonna be distance to the closest lion sighting, and/or it will be the number of sightings in the territory per year.
+
+ - Number of lions/sightings
+ - Distance from the closest sighting
+
+To do so, I will use the dataframe "tblPredatorsPerSession".
+
+```{r}
+
+DF_lions <- tblPredatorsPerSession |>
+  subset(predator == "lion") |>
+  select(-c(3, 4, 6:8))
+
+DF_lions$num_individuals <- as.double(DF_lions$num_individuals)
+length(unique(DF_lions$session)) #6019
+
+#I want to sum up the number of lions for each session instead of having sessions duplicated rows
+DF_lions_sum <- DF_lions |>
+  group_by(session) |>
+  summarise(num_lion = sum(num_individuals, na.rm = TRUE))
+# suppose to have 6019 rows
+
+```
+
+I also need to join the session ID to the location landmark dataframe.
+
+```{r}
+
+DF_lions_loc_data <- tblLocationsPerSession |>
+  select(c(1, 5, 6, 7)) |>
+  #Here, I want to change the NAs in utme and utmn for the GPS points of the landmark
+  mutate(landmark_id = str_replace_all(landmark_id, " ", "_"))
+
+
+
+DF_lions_loc <- merge(DF_lions_sum, DF_lions_loc_data, by = "session")
+
+# theres a difference of 302 rows between DF_lions_loc and DF_lions_sum... 
+# not sure why
+```
+
+I also need to join the tblSessions to get the clan territory and date of the specific sessions ID.
+
+
+```{r}
+
+DF_lions_sess_data <- tblSessions |>
+  select(c(1, 2, 4))
+
+# merge the lions data with the session data to get the year and everything
+DF_lions_date <- merge(DF_lions_loc, DF_lions_sess_data, by = "session")
+
+
+DF_lions_clans <- DF_lions_date |>
+  # keep only the clans that we are interested in
+  subset(str_detect(clan, "talek") | str_detect(clan, "serena") | str_detect(clan, "happy.zebra")) |>
+  # now we extract the year 
+  separate(date, c("year", "month", "day"), sep = "-", remove = F) |>
+  select(-c(month, day)) |>
+  
+  mutate(landmark_id = case_when(
+    landmark_id == "Lion_L" ~ "Lion_Lugga", #Lion_L to Lion_Lugga
+    landmark_id == "13_Lugga_South" ~ "Culvert_of_13_Lugga_South", #Culvert_of_13_Lugga_South for 13_Lugga_South\
+    landmark_id == "Border_T" ~ "Border_Tree",   #Border_T to Border_Tree
+    landmark_id == "Gomer's_D" ~ "Gomer_den",   # Gomer's_D to Gomer_den
+    landmark_id == "K-6_Den" ~ "K6_Den", #K-6_Den to K6_Den
+    landmark_id == "Simba_L_X" ~ "Simba_Lugga_Crossing",  #Simba_L_X to Simba_Lugga_Crossing
+    TRUE ~ landmark_id   # keep everything else unchanged
+  ))
+```
+
+Now we add the GPS points for the utme and utmn columns with NAs based on the landmark ID point.
+
+```{r}
+
+# first create a dataframe with all the coordinates for the landmarks:
+DF_lndmk <- tblLandmarks |>
+  select(landmark_id, utme, utmn) |>
+  mutate(landmark_id = str_replace_all(landmark_id, " ", "_"))
+
+
+# this is to put the landmark coordinates where there are NAs in the utme and utmn columns
+DF_lions_data <- DF_lions_clans |>
+  left_join(DF_lndmk, by = "landmark_id", suffix = c("", "_df2"), relationship = "many-to-many") |>
+  mutate(utme = ifelse(is.na(utme), utme_df2, utme), 
+         utmn = ifelse(is.na(utmn), utmn_df2, utmn)) |>
+  select(-utme_df2, -utmn_df2)  |>
+  drop_na(utmn) # get rid of NAs for utmn column
+
+
+# now we change those weird coordinates for the landmark coordinates
+DF_lions_data2 <- DF_lions_data |>
+  left_join(DF_lndmk, by = "landmark_id", suffix = c("", "_df2"), relationship = "many-to-many") |>
+  mutate(
+    utme = if_else(session == "s13727" | 
+                     session == "s22671" |
+                     session == "s22901" |
+                     session == "s6586" |
+                     session == "t105678" |
+                     session == "t88078" |
+                     session == "s10853", utme_df2, utme),
+    utmn = if_else(session == "s13727" | 
+                     session == "s22671" |
+                     session == "s22901" |
+                     session == "s6586" |
+                     session == "t105678" |
+                     session == "t88078" |
+                     session == "s10853", utmn_df2, utmn)
+  ) |>
+  select(-utme_df2, -utmn_df2) |>
+  drop_na(utmn) |>
+  mutate(landmark_id = replace_na(landmark_id, "random"))
+
+  
+str(DF_lions_data2)
+
+DF_lions_data2$utme <- as.numeric(DF_lions_data2$utme)
+DF_lions_data2$utmn <- as.numeric(DF_lions_data2$utmn)
+
+DF_lions_data2 <- DF_lions_data2 |>
+  drop_na(utme)
+
+```
+
+
+I got some num of individual that are 0 :
+s114919 --> change to num = 2
+t61954 --> change to 1
+t67315 --> change to 1
+t77054 --> will put 1
+
+remove (they all have 0 as a number of lions -- maybe we will keep them eventually ?)
+s165
+t101874.10
+t1475.4
+t53055
+t57427
+t60317
+t62190
+t75009
+t77236
+
+```{r}
+
+DF_lions_data2 <- DF_lions_data2 |>
+  mutate(num_lion = ifelse(session == "s114919", 2, num_lion)) |>
+  mutate(num_lion = ifelse(session == "t61954" | 
+                             session == "t67315" |
+                             session == "t77054", 1, num_lion)) |>
+  filter(num_lion != 0)
+    
+
+```
+
+
+Outliers
+Change the first 7 in utmn for a 9:
+"t102747" & "s109502"
+
+Take out "t64548" because utmn has 6 numbers --> will change later.
+same for s0.58
+
+utme miss 1 number:
+and t60077
+
+utme has 1 number too many:
+t50935
+t72442
+t98672
+t115432
+
+wrong coordinate:  (somewhere in tanzania, so probably a number is off)
+s24841
+```{r}
+
+DF_lions_data2 <- DF_lions_data2 |>
+  mutate(utmn = ifelse(session == "t102747" | session == "s109502", as.numeric(paste0("9", substring(utmn, 2))),
+                  utmn))  |>
+  filter(session != "t64548") |>
+  filter(session != "s0.58") |>
+  filter(session != "t60077") |>
+  filter(session != "t50935") |>
+  filter(session != "t72442") |>
+  filter(session != "t98672") |>
+  filter(session != "t115432") |>
+  filter(session != "s24841")
+  
+
+```
+
+
+
+
+
+Saving it to shp.
+```{r}
+
+sf_df_lions <- st_as_sf(DF_lions_data2, coords = c("utme", "utmn"), crs = 32736)
+
+#Save the sf dataframe - can only do it once when it is not created before
+CD_sf_lions <- sf::st_write(sf_df_lions, "data_files/CD_sf_lions.shp")
+
+CD_sf_lions <- sf::st_read("data_files/CD_sf_lions.shp")
+
+```
+
+Change to wgs84
+```{r}
+CD_lions_wgs84 <- st_transform(CD_sf_lions, crs = 4326)
+#4326 is the EPSG code for the WGS84 system, which uses degrees of latitude and longitude.
+
+# save the lat long data points into a shapefile 
+CD_lions_wgs84 <- sf::st_write(CD_lions_wgs84, "data_files/CD_lions_wgs84.shp")
+
+#to read the shape file just created
+CD_lions_wgs84 <- sf::st_read("data_files/CD_lions_wgs84.shp")
+
+
+```
+
+
+###data
+```{r}
+
+lions_data <- CD_sf_lions |>
+  group_by(year, clan) |>
+  summarize(n_lion = sum(num_lin))
+
+lions_data <- st_drop_geometry(lions_data)
+
+write.csv2(lions_data, "data_files/lions_data.csv", row.names = F, quote = F)
+
+lions_data_per_clan <- lions_data|>
+  group_by(clan) |>
+  summarize(n_lion = sum(n_lion))
+
+flextable(lions_data_per_clan)
+
+```
+
+
+
+
+

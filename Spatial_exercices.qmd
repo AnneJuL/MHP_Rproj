@@ -1,0 +1,93 @@
+---
+title: "Spatial_excercices"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+#Exercices
+
+This is just some exercices from Guélat document to see how to process spatial data in R
+
+
+First, we need to download the appropriate packages:
+```{r}
+
+library(dplyr) # data manip
+
+#to make maps and plotting:
+library(sf) 
+library(mapview)
+library(leaflet)
+library(leaflet.extras)
+library(amt)
+
+#from Guélat
+library(leaflet.extras2)
+library(terra) #to work with raster data
+library(lwgeom)
+library(spatstat.random)
+library(spdep)
+library(httr2)
+library(tmap)
+library(tmaptools)
+library(classInt)
+library(leafsync)
+library(qgisprocess)
+```
+
+
+#Multipolygon
+
+We will make a multipolygon, which is polygon1 and polygon2. Polygon1 has a hole in the middle.
+```{r}
+
+pol1_border <- rbind(c(1, 5), c(2, 2), c(4, 1), c(4, 4), c(1, 5))
+pol1_hole <- rbind(c(2, 4), c(3, 4), c(3, 3), c(2, 3), c(2, 4))
+pol1 <- list(pol1_border, pol1_hole)
+pol2 <- list(rbind(c(0, 2), c(1, 2), c(1, 3), c(0, 3), c(0, 2)))
+multipolygon_list <- list(pol1, pol2)
+multipol <- st_multipolygon(multipolygon_list)
+multipol
+
+```
+
+Now we plot the multipolygon:
+```{r}
+
+plot(multipol, col = "navy")
+
+```
+
+
+```{r}
+pts <- st_as_sfc(c("POINT(2657000 1219000)", "POINT(2658000 1218000)", "POINT(2659000 
+1217000)"), crs = "EPSG:2056")
+
+
+plot(pts)
+
+
+```
+
+
+
+```{r}
+#to explore how CRSs are stored in modern GIS software:
+st_crs(32736) # my CRS we use in kenya
+st_crs(32737) # another CRS used in Kenya, but from the 36°E to the 42°E, so just past the Mara 
+
+```
+
+```{r}
+st_layers("data/geodata.gpkg")
+```
+
+
+```{r}
+data(World)
+
+```
+
+
