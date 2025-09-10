@@ -4,7 +4,7 @@ format: html
 editor: visual
 ---
 
-###OSM
+### OSM
 
 OSM = OpenStreet Map it uses Overpass which is an online API. If someone mapped Talek borders in OSM over the years, I will be able to extract it yearly. After doing this function, it says that there are no boundaries for Talek, so I will just extract satellite imagery for each year and then draw my own polygons over talek town using pixels with buildings and stuff
 
@@ -62,7 +62,7 @@ print(talek_2020)
 
 ```
 
-##2.4. Yearly KDE
+## 2.4. Yearly KDE
 
 ```{r Calculating}
 
@@ -360,7 +360,6 @@ plotRGB(img, r = 1, g = 2, b = 3, stretch = "lin")
 
 ```
 
-
 ##i) Prey abundance
 
 Will use the Prey census data. We have 2 prey transects per month. Maybe we can do that per month, and just count the total number of preys per month. That would give us an estimate of the monthly abundance of prey, which is good because prey abundance does vary according to season, which in our case is represented by the month.
@@ -479,37 +478,131 @@ CD_data_prey <- merge(CD_for_map, PREY_dat_all, by = c("month", "year"))
 ```
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+## Data cleaning (GPS points):
+```{r}
+DB_locations_for_KDEs_clean <- DB_locations_for_KDEs |>
+  
+  #Change the utme coordinates that are 111111 and 1111111
+  left_join(DF_lndmk %>% select(landmark_id, utme_new = utme, utmn_new = utmn),
+            by = "landmark_id", relationship = "many-to-many") |>
+  mutate(
+    utme = if_else(utme == "11111", utme_new, utme),
+    utmn = if_else(utme == "11111", utmn_new, utmn)) |>
+  mutate(
+    utme = if_else(utme == "111111", utme_new, utme),
+    utmn = if_else(utme == "111111", utmn_new, utmn)) |>
+  mutate(
+    utme = if_else(utme == "1111111", utme_new, utme),
+    utmn = if_else(utme == "1111111", utmn_new, utmn)) |>
+  # now same for the 1111111 in utmn:
+  mutate(
+    utme = if_else(utmn == "1111111", utme_new, utme),
+    utmn = if_else(utmn == "1111111", utmn_new, utmn)) |>
+  # change when I have 0s in utme and/or utmn
+  mutate(
+    utme = if_else(landmark_id == "Stupid_Tree" & utme == 0 & utmn == 0,
+                   utme_new, utme),
+    utmn = if_else(landmark_id == "Stupid_Tree" & utme == 0 & utmn == 0,
+                   utmn_new, utmn)) |>
+  mutate( # session t99428
+    utme = if_else(landmark_id == "Stupid_Tree" & utmn == "0", utme_new, utme),
+    utmn = if_else(landmark_id == "Stupid_Tree" & utmn == "0", utmn_new, utmn)) |>
+  #change the utme value of 98... of Fig_Tree_Lugga_-_Top
+  mutate(
+    utme = if_else(landmark_id == "Fig_Tree_Lugga_-_Top" & utme == 9840057, utme_new, utme),
+    utmn = if_else(landmark_id == "Fig_Tree_Lugga_-_Top" & utme == 9840057, utmn_new, utmn)) |>
+  # now we remove the utme and utmn new columns
+  select(-utme_new, -utmn_new) # |>
+  
+  #remove the 0 in from of Uwanja_Den_2
+  mutate(
+    utme = if_else(
+      landmark_id == "Uwanja_Den_2" & grepl("^0", utme),
+      sub("^0", "", utme),
+      utme)) |>
+  #remove the last digit of a 7 digit utme
+  mutate(
+    utme = if_else(
+      landmark_id == "Stupid_Tree" & nchar(as.character(utme)) == 7,
+      substr(as.character(utme), 1, 6),   # keep only first 6 digits
+      as.character(utme))) |>
+  # change the airstrip_den utme and utmn value with a comma
+  mutate(
+    utme = if_else(
+      landmark_id == "Airstrip_Den",
+      sub(".*,", "", as.character(utme)),   # take everything after the comma
+      as.character(utme)),
+    utmn = if_else(
+      landmark_id == "Airstrip_Den",
+      sub(".*,", "", as.character(utmn)),   # same for utmn
+      as.character(utmn))) |>
+  # same for the TWin_trees values
+  mutate(
+    utme = if_else(
+      landmark_id == "Twin_Trees",
+      sub(".*,(.*)$", "\\1", as.character(utme)),   # keep last number
+      as.character(utme)),
+    utmn = if_else(
+      landmark_id == "Twin_Trees",
+      sub(".*,(.*)$", "\\1", as.character(utmn)),   # same for utmn
+      as.character(utmn))) |>
+  #for session t117205, add a 4 after the first 7, and session t111704 add a 5 after the 7
+  mutate(
+    utme = if_else(
+      landmark_id == "Laura_Tree" & utme == "79731",
+      sub("^7", "74", utme),
+      utme)) |>
+  mutate(
+    utme = if_else(
+      landmark_id == "Sunshine_Tree" & utme == "70360",
+      sub("^7", "75", utme),
+      utme)) |>
+  # change the session t99585 and t60813 and swap 4 and 7 in utme
+  mutate(
+    utme = if_else(
+      landmark_id == "Stupid_Tree" & utme == "476966",
+      sub("^47", "74", utme),
+      utme)) |>
+  mutate(
+    utme = if_else(
+      landmark_id == "Green_Den" & utme == "477420",
+      sub("^47", "74", utme),
+      utme)) |>
+  #same for session and change 5 and 7
+   mutate(
+    utme = if_else(
+      landmark_id == "Croton_Island-East_Edge" & utme == "570527",
+      sub("^57", "75", utme),
+      utme)) |>
+  mutate(
+    utme = if_else(
+      landmark_id == "Cow_Tree" & utme == "570804",
+      sub("^57", "75", utme),
+      utme)) |>
+  mutate(
+    utme = if_else(
+      landmark_id == "Hi_Step_X" & utme == "573282",
+      sub("^57", "75", utme),
+      utme)) |>
+  
+  #take out the Low_Ranker's_Crossing cause utmn= utme
+  filter(landmark_id != "Low_Ranker's_Crossing") |>
+  
+  #change the utmn starting with 6 to 9
+  mutate(utmn = if_else(
+      grepl("^6", utmn),
+      sub("^6", "9", utmn),
+      utmn)) |>
+  mutate(utmn = if_else(
+      grepl("^7", utmn),
+      sub("^7", "9", utmn),
+      utmn)) |>
+  #remove the 8th digit if there is one
+  mutate(utmn = if_else(
+      nchar(utmn) == 8,
+      substr(utmn, 1, 7),  # keep only the first 7 characters
+      utmn)) |>
+  #take out the session t54706 because utmn = 99 and the point is ~700m from the landmark
+  filter(session != "t54706") |>
+  filter(nchar(utmn) != 6)
+```

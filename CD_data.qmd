@@ -217,6 +217,481 @@ str(CD_for_map)
 ```
 
 
+
+##1.1. All GPS locations
+
+We will be using the GPS locations of all the points that hyenas were seen. We will use that to create KDEs and then create the random points to run the RSF.
+
+So I have the table hyenas per session, which has a column for hyena IDs and session IDs. I will keep just these two rows, and filter to keep only serena's sessions and talek (not fig tree, pond, etc.).
+I will also add the individual's clan with tlbHyenas.
+
+```{r Sessions with hyenas}
+DB_hyenas <- tblHyenasPerSession |>
+  select(session, id, date) |>
+  filter(!grepl("-mr", session)) |>
+  filter(!grepl("-ft", session)) |>
+  filter(!grepl("amb", session)) |>
+  separate(date, c("year", "month", "day"), sep = "-", remove = F)
+  
+
+
+
+# before adding the clan to the hyenas ids, I want to make sure each id have only 1 clan associated (see session S115986)
+
+# before that, we will identify the ids that are duplicated because its hyenas born in one clan who immigrated in another one :
+
+dupe_rows_indID <- tblClanMembership |>
+  select(id, clan, status, notes) |>
+  filter(id %in% id[duplicated(id)]) |>
+  filter(clan != "unknown") |>
+  filter(id %in% id[duplicated(id)]) |>
+  filter(clan != "kcm") |>
+  filter(id %in% id[duplicated(id)]) |>
+  group_by(id) |>
+  filter(n() > 1 & n_distinct(clan) > 1) |>
+  ungroup() |>
+  filter(clan == "talek" | clan == "serena.s" | clan == "serena.n" | clan == "happy.zebra" | clan == "talek.w") |>
+  filter(id %in% id[duplicated(id)]) |>
+  select(-notes) |>
+  filter(id %in% id[duplicated(id)]) |>
+  group_by(id) |>
+  filter(n() > 1 & n_distinct(clan) > 1) |>
+  slice(2) |>
+  ungroup()
+
+
+length(unique(dupe_rows_indID$id)) #20
+
+```
+
+
+
+Slicing the hyenas with the correct clan :
+
+```{r Sessions with hyenas}
+
+DB_ind_clan <- tblClanMembership |> # there are 3097 hyenas
+  select(id, clan, status) |>
+  filter(clan == "talek" | clan == "serena.s" | clan == "serena.n" | clan == "happy.zebra" | clan == "talek.w") |> # now we have 2061 hyenas
+  mutate(clan = str_replace_all(clan, "talek.w", "talek")) |> 
+  distinct() |>
+  # to keep the second row of the duplicated ids
+  group_by(id) |>
+  filter(n() == 1 | row_number() == 2) |>
+  ungroup()
+
+
+length(unique(DB_ind_clan$id)) #1966 ind
+
+dupes_diff_clan <- DB_ind_clan %>%
+  group_by(id) %>%
+  filter(n_distinct(clan) > 1) %>%
+  ungroup()
+
+
+
+
+```
+
+
+```{r Sessions with hyenas}
+
+# Then I want to add the clan for each individual 
+DB_hyenas_clan <- DB_hyenas |>
+  left_join(DB_ind_clan %>% select(id, clan), by = "id", relationship = "many-to-many") |>
+  filter(clan == "talek" | clan == "talek.w" | clan == "serena.n" | clan == "serena.s" | clan == "happy.zebra") |>
+  #changing talek.w into talek
+  mutate(clan = str_replace_all(clan, "talek.w", "talek")) |>
+  mutate(clan = str_replace_all(clan, "\\.", "")) |>
+  group_by(session, clan, year) |>
+  summarise(
+    hyenas = paste(unique(id), collapse = ","),
+    .groups = "drop")
+
+# then, let's get rid of the NAs in hyenas_id:
+DB_hyenas_clan <- DB_hyenas_clan |>
+  drop_na(hyenas) # No NA
+
+
+
+
+
+# So, all this time I had a dataset with the sessions ID, clan, hyenas ID and date:
+
+DB_session_hyenasID <- tblSessions |>
+  select(clan, date, session, location, hyenas) |>
+  filter(clan == "talek" | clan == "talek.w" | clan == "serena.n" | clan == "serena.s" | clan == "happy.zebra") |>
+  separate(date, c("year", "month", "day"), sep = "-", remove = F) |>
+  select(-month, -day, -date) |>
+  mutate(clan = str_replace_all(clan, "talek.w", "talek")) |>
+  mutate(clan = str_replace_all(clan, "\\.", "")) |>
+  filter(!grepl("-mr", session)) |>
+  filter(!grepl("-ft", session)) |>
+  filter(!grepl("amb", session))
+
+# then, let's get rid of the NAs in hyenas_id:
+DB_session_hyenasID <- DB_session_hyenasID |>
+  drop_na(hyenas) # from 151719 to 122558 (difference of 29161)
+
+
+```
+
+I have more lines in DB_session_hyenasID (122558) than in DB_hyenas_clan (128 324). The difference is 5766. Let's see what are the differences:
+```{r}
+
+extra_rows <- DB_session_hyenasID |>
+  distinct(session, year, hyenas, clan) |>
+  anti_join(DB_hyenas_clan |>
+              distinct(session, year, hyenas, clan),
+            by = c("session", "year", "hyenas", "clan"))
+#This is 6038
+
+
+extra_sessions <- DB_session_hyenasID |>
+  distinct(session) |>
+  anti_join(DB_hyenas_clan %>% distinct(session), by = "session")
+#this is 1340
+
+
+extra_rows <- DB_session_hyenasID |>
+  distinct(session, year, clan) |>
+  anti_join(
+    DB_hyenas_clan %>% distinct(session, year, clan),
+    by = c("session", "year", "clan"))
+#1791
+
+common_rows <- DB_session_hyenasID %>%
+  distinct(session, year, clan) %>%
+  inner_join(
+    DB_hyenas_clan %>% distinct(session, year, clan),
+    by = c("session", "year", "clan"))
+#120 767
+
+```
+
+
+
+
+
+
+
+
+
+Now that we have the sessions with all the hyenas that were seen in each of our 3 territories, we want to add the GPS location of those sessions.
+We will use tblLocationsPerSession.
+
+```{r Adding GPS location}
+
+DB_all_locations <- DB_session_hyenasID |>
+  left_join(tblLocationsPerSession %>% select(session, landmark_id, utme, utmn), by = "session", relationship = "many-to-many") |>
+  #take the first row out
+  group_by(session) |>
+  slice(1) |>
+  ungroup()
+
+dupe_rows <- DB_session_hyenasID %>%
+  filter(session %in% session[duplicated(session)])# no duplicates
+
+
+```
+
+
+Now we want to fill the NAs with the landmark ID GPS point. 
+
+```{r Filling the NAs}
+
+# first create a dataframe with all the coordinates for the landmarks:
+
+DF_lndmk <- tblLandmarks |>
+  select(landmark_id, utme, utmn) |>
+  mutate(landmark_id = str_replace_all(landmark_id, " ", "_")) |>
+  filter(!(landmark_id == "Marsh_Den" & (is.na(utme) | is.na(utmn))))
+
+
+# should be 75271 rows:
+DB_locations_for_MCPs <- DB_all_locations |>
+  mutate(landmark_id = str_replace_all(landmark_id, " ", "_")) |>
+  filter(!(landmark_id == "~NA" & is.na(utme) & is.na(utmn))) |>
+  filter(!(is.na(landmark_id) & is.na(utme) & is.na(utmn))) |>
+  
+  #changing the names that doesn't match:
+  mutate(landmark_id = case_when(
+    landmark_id == "Airstrip_D" ~ "Airstrip_Den",
+    landmark_id == "Maushugana_D_11" ~ "Mashugana_Den_II",
+    landmark_id == "Arba_Den" ~ "ARBA_Natal_Den",  
+    landmark_id == "Banana_T" ~ "Banana_Tree",
+    landmark_id == "upro_d" ~ "Uproar_Den",   
+    landmark_id == "Uproar_D" ~ "Uproar_Den", 
+    landmark_id == "cop_c" ~ "Copulation_Culvert", #verify
+    landmark_id == "Coral_Rf" ~ "Coral_Reef",
+    landmark_id == "Border_Lugga" ~ "South_Border_Lugga",
+    landmark_id == "btn_Mystery_Spot_&_Talek_Gate_on_basecamp_plain" ~ "Mystery_Spot",
+    landmark_id == "Camel_X" ~ "Camel_Crossing",
+    landmark_id == "Century_X" ~ "Century_Crossing",
+    landmark_id == "Crtn_Edge_Den" ~ "Croton_Edge_Communal_Den",
+    landmark_id == "Dave_D" ~ "Dave_Den",
+    landmark_id == "Fever_T_ND/Cd_Cplx" ~ "Fever_Tree_Natal_Den/Communal_Den_Complex",
+    landmark_id == "FFL_Wrap" ~ "Falafel_Wrap",
+    landmark_id == "Hat_T" ~ "Hat_Tree",
+    landmark_id == "K-6_Den" ~ "K6_Den",
+    landmark_id == "Leopard_Sex_X" ~ "Leopard_Sex_Crossing",
+    landmark_id == "MGTA_ND_13" ~ "MGTA_ND13",
+    landmark_id == "Paula`s_Pond" ~ "Paula's_Pond",
+    landmark_id == "Plant_D" ~ "Plantation_Den",
+    landmark_id == "Pole_T" ~ "Pole_Tree",
+    landmark_id == "Precipice_Den_3" ~ "Precipice_Den_III",
+    landmark_id == "S_Lodge" ~ "Serena_Lodge",
+    landmark_id == "Sbre_Gtwy_X" ~ "Sabre_Gateway_X",
+    landmark_id == "Sherbert_D" ~ "Sherbert_Den",
+    landmark_id == "Top_T_L" ~ "Talek_Lugga_-_Top",
+    landmark_id == "TT_L" ~ "Talek_Lugga_-_Top",
+    landmark_id == "Vulture_X" ~ "Vulture_Crossing",
+    landmark_id == "Central_Park_CD2" ~ "Central_Park_Communal_Den",
+    landmark_id == "Rbend_D" ~ "Riverbend_Den",
+    landmark_id == "Leopard_X" ~ "Leopard_Crossing",
+    landmark_id == "Talek_L_X" ~ "Talek_Lugga_Crossing",
+    landmark_id == "T_Marsh" ~ "Talek_Marsh",
+    landmark_id == "Border_T" ~ "Border_Tree",
+    landmark_id == "Stupid_T" ~ "Stupid_Tree",
+    landmark_id == "Dave_L_X" ~ "Dave's_Lugga_Crossing",
+    landmark_id == "Top_FT_L" ~ "Fig_Tree_Lugga_-_Top",
+    landmark_id == "Aardwolf_Rd_T" ~ "Aardwolf_Trees",
+    landmark_id == "Diamond_X" ~ "Diamond_Crossing",
+    landmark_id == "Gomer's_D" ~ "Gomer_den",
+    landmark_id == "Lion_L" ~ "Lion_Lugga",
+    landmark_id == "Simba_L_X" ~ "Simba_Lugga_Crossing", 
+
+    TRUE ~ landmark_id   # keep everything else unchanged
+  )) |>
+  
+  # Filling up the NAs
+  left_join(DF_lndmk |>
+      select(landmark_id, utme_df2 = utme, utmn_df2 = utmn) |>
+      distinct(landmark_id, .keep_all = TRUE),
+    by = "landmark_id") |>
+  mutate(utme = ifelse(is.na(utme), utme_df2, utme), 
+         utmn = ifelse(is.na(utmn), utmn_df2, utmn)) |>
+  select(-utme_df2, -utmn_df2) |>
+  
+   #getting rid of landmark that I have no idea what they are..
+  filter(landmark_id != "Martins_Den") |>
+  filter(landmark_id != "Kit_Kat_Den_2") |>
+  filter(landmark_id != "ccb") |>
+  filter(landmark_id != "Precipice_Den_3") |>
+  filter(landmark_id != "Albatross_Den_2") |>
+  filter(landmark_id != "corner_of_baboon_culdesec") |># double check for Cul_de_sac
+  filter(landmark_id != "Baboon_Culdesac") |>
+  filter(landmark_id != "Dave_Den") |>
+  filter(landmark_id != "Jackal_Hill") |>
+  filter(landmark_id != "KCM_D") |>
+  filter(landmark_id != "Main_DOC_X") |># we have that location for sure --> verify
+  filter(landmark_id != "MB_X") |>
+  filter(landmark_id != "Mteer_D" ) |>#Maybe 3 musketeer?? 
+  filter(landmark_id != "NCM_D") |>
+  filter(landmark_id != "No_Name_Hill_Culdesac") |>
+  filter(landmark_id != "Picasso_Shrub") |>
+  filter(landmark_id != "Pond_Crossing") |>
+  filter(landmark_id != "Top_???") |>
+  filter(landmark_id != "Top_Bane_Lugga") |>
+  filter(landmark_id != "Top_Bane_L") |>
+  filter(landmark_id != "Eland_Hill") |>
+  filter(landmark_id != "676") |>  # no utme and utmn for this in DF_lndmk
+  filter(landmark_id != "13_Lugga_South") |>
+  filter(landmark_id != "Base_of_Jackel_Hill_&_top_of_Den_One_Creek") |>
+  filter(landmark_id != "Den_Six") |>
+  filter(landmark_id != "HML_ND") |>
+  filter(landmark_id != "JH_T") |>
+  filter(landmark_id != "kindt") |>
+  filter(landmark_id != "NCCPA") |>
+  filter(landmark_id != "NCM_D") |>
+  filter(landmark_id != "Pilot's_D") |>
+  filter(landmark_id != "Top_E_Fork_HS_L")
+
+  
+
+# important to remember those!! it's probably the sessions in 1988-2000 where the GPS locations was not associated to the sessions.
+DB_NAs <- DB_all_locations |>
+  filter(if_all(c(landmark_id, utme, utmn), is.na)) #51 267 obs
+
+```
+
+Now we have to deal with the weird coordinates that will create fuckall points.
+
+ex: Reach_Out_and_Touch_Mound
+```{r Weird coordinates}
+
+DB_locations_for_MCPs_clean <- DB_locations_for_MCPs |>
+  
+  #Change the utme coordinates that are 111111 and 1111111
+  left_join(DF_lndmk %>% 
+      select(landmark_id, utme_new = utme, utmn_new = utmn) %>% 
+      distinct(landmark_id, .keep_all = TRUE),
+    by = "landmark_id") |>
+  mutate(
+    utme = if_else(utme == "11111", utme_new, utme),
+    utmn = if_else(utme == "11111", utmn_new, utmn)) |>
+  mutate(
+    utme = if_else(utme == "111111", utme_new, utme),
+    utmn = if_else(utme == "111111", utmn_new, utmn)) |>
+  mutate(
+    utme = if_else(utme == "1111111", utme_new, utme),
+    utmn = if_else(utme == "1111111", utmn_new, utmn)) |>
+  # now same for the 1111111 in utmn:
+  mutate(
+    utme = if_else(utmn == "1111111", utme_new, utme),
+    utmn = if_else(utmn == "1111111", utmn_new, utmn)) |>
+  # change when I have 0s in utme and/or utmn
+  mutate(
+    utme = if_else(landmark_id == "Stupid_Tree" & utme == 0 & utmn == 0,
+                   utme_new, utme),
+    utmn = if_else(landmark_id == "Stupid_Tree" & utme == 0 & utmn == 0,
+                   utmn_new, utmn)) |>
+   mutate(
+    utme = if_else(landmark_id == "Rhino_Tree" & utme == 0 & utmn == 0,
+                   utme_new, utme),
+    utmn = if_else(landmark_id == "Rhino_Tree" & utme == 0 & utmn == 0,
+                   utmn_new, utmn)) |>
+   mutate(
+    utme = if_else(landmark_id == "Saga_Lugga_Crossing" & utme == 0 & utmn == 0,
+                   utme_new, utme),
+    utmn = if_else(landmark_id == "Saga_Lugga_Crossing" & utme == 0 & utmn == 0,
+                   utmn_new, utmn)) |>
+  
+  #change the utme value of 98... of Fig_Tree_Lugga_-_Top
+  mutate(
+    utme = if_else(landmark_id == "Fig_Tree_Lugga_-_Top" & utme == 9840057, utme_new, utme),
+    utmn = if_else(landmark_id == "Fig_Tree_Lugga_-_Top" & utme == 9840057, utmn_new, utmn)) |>
+  # now we remove the utme and utmn new columns
+  select(-utme_new, -utmn_new) |>
+  
+  # change the airstrip_den utme and utmn value with a comma
+  mutate(
+    utme = if_else(
+      landmark_id == "Airstrip_Den",
+      sub(".*,", "", as.character(utme)),   # take everything after the comma
+      as.character(utme)),
+    utmn = if_else(
+      landmark_id == "Airstrip_Den",
+      sub(".*,", "", as.character(utmn)),   # same for utmn
+      as.character(utmn))) |>
+  
+ # change the session t99585 and t60813 and swap 4 and 7 in utme
+  mutate(
+    utme = if_else(
+      landmark_id == "Stupid_Tree" & utme == "476966",
+      sub("^47", "74", utme),
+      utme)) |>
+  mutate(
+    utme = if_else(
+      landmark_id == "Green_Den" & utme == "477420",
+      sub("^47", "74", utme),
+      utme)) |>
+  
+  #same for session t116873, t116658 and t54139 (change 5 and 7)
+   mutate(
+    utme = if_else(
+      landmark_id == "Croton_Island-East_Edge" & utme == "570527",
+      sub("^57", "75", utme),
+      utme)) |>
+  mutate(
+    utme = if_else(
+      landmark_id == "Cow_Tree" & utme == "570804",
+      sub("^57", "75", utme),
+      utme)) |>
+  mutate(
+    utme = if_else(
+      landmark_id == "Hi_Step_X" & utme == "573282",
+      sub("^57", "75", utme),
+      utme)) #|>
+
+
+
+
+
+
+  #remove the last digit of a 7 digit utme
+  mutate(
+    utme = if_else(
+      landmark_id == "Stupid_Tree" & nchar(as.character(utme)) == 7,
+      substr(as.character(utme), 1, 6),   # keep only first 6 digits
+      as.character(utme))) |>
+ 
+  
+  # same for the TWin_trees values
+  mutate(
+    utme = if_else(
+      landmark_id == "Twin_Trees",
+      sub(".*,(.*)$", "\\1", as.character(utme)),   # keep last number
+      as.character(utme)),
+    utmn = if_else(
+      landmark_id == "Twin_Trees",
+      sub(".*,(.*)$", "\\1", as.character(utmn)),   # same for utmn
+      as.character(utmn))) |>
+  #for session t117205, add a 4 after the first 7, and session t111704 add a 5 after the 7
+  mutate(
+    utme = if_else(
+      landmark_id == "Laura_Tree" & utme == "79731",
+      sub("^7", "74", utme),
+      utme)) |>
+  mutate(
+    utme = if_else(
+      landmark_id == "Sunshine_Tree" & utme == "70360",
+      sub("^7", "75", utme),
+      utme)) |>
+
+  
+  #take out the Low_Ranker's_Crossing cause utmn= utme
+  filter(landmark_id != "Low_Ranker's_Crossing") |>
+  
+  #change the utmn starting with 6 to 9
+  mutate(utmn = if_else(
+      grepl("^6", utmn),
+      sub("^6", "9", utmn),
+      utmn)) |>
+  mutate(utmn = if_else(
+      grepl("^7", utmn),
+      sub("^7", "9", utmn),
+      utmn)) |>
+  #remove the 8th digit if there is one
+  mutate(utmn = if_else(
+      nchar(utmn) == 8,
+      substr(utmn, 1, 7),  # keep only the first 7 characters
+      utmn)) |>
+  #take out the session t54706 because utmn = 99 and the point is ~700m from the landmark
+  filter(session != "t54706") |>
+  filter(nchar(utmn) != 6)
+
+# i have 183 rows with weird coordinates, we will examine them...
+DF_check <- DB_locations_for_KDEs_clean |>
+  filter(nchar(utme) != 6 | nchar(utmn) != 7)
+
+# for now, i will just take them out, to be able to visualize the points, but we will figure out what to do with it 
+
+DB_locations_for_KDEs_test <- DB_locations_for_KDEs_clean |> #DB_locations_for_KDEs_clean = 71751 rows
+  filter(!session %in% DF_check$session)
+
+```
+
+Now we visualize to see if there are still weird outliers points:
+```{r}
+# first convert in sf object :
+DB_locations_for_KDEs_test_sf <- st_as_sf(DB_locations_for_KDEs_test, coords = c("utme", "utmn"), crs = 32736)
+
+# map to visualize
+mapview(DB_locations_for_KDEs_test_sf, xcol = "utme", ycol = "utmn", zcol = "category")
+# this is to see the outliers
+
+```
+The points that looks like outliers:
+- t120888
+- s58
+- t55969
+- t112359
+- s6974
+- s115706
+- s117340 
+
+
 #2. Shapefiles
 
 SHP file contains geometrical information (for example shape type and coordinates). DBF file contains additional attribute information (for example name or temperature)
@@ -296,14 +771,6 @@ CD_sf_wgs84 <- CD_sf_wgs84 |>
 ```
 
 
-
-##1.1. All GPS locations 
-
-```{r}
-
-
-
-```
 
 
 
@@ -780,7 +1247,7 @@ This variable is gonna be distance to the closest lion sighting, and/or it will 
 
 To do so, I will use the dataframe "tblPredatorsPerSession".
 
-```{r}
+```{r filtering the lions}
 
 DF_lions <- tblPredatorsPerSession |>
   subset(predator == "lion") |>
@@ -799,7 +1266,7 @@ DF_lions_sum <- DF_lions |>
 
 I also need to join the session ID to the location landmark dataframe.
 
-```{r}
+```{r Join Session ID to Landmark location}
 
 DF_lions_loc_data <- tblLocationsPerSession |>
   select(c(1, 5, 6, 7)) |>
@@ -817,7 +1284,7 @@ DF_lions_loc <- merge(DF_lions_sum, DF_lions_loc_data, by = "session")
 I also need to join the tblSessions to get the clan territory and date of the specific sessions ID.
 
 
-```{r}
+```{r Clan and year}
 
 DF_lions_sess_data <- tblSessions |>
   select(c(1, 2, 4))
@@ -846,13 +1313,10 @@ DF_lions_clans <- DF_lions_date |>
 
 Now we add the GPS points for the utme and utmn columns with NAs based on the landmark ID point.
 
-```{r}
+```{r Filling NAs}
 
 # first create a dataframe with all the coordinates for the landmarks:
-DF_lndmk <- tblLandmarks |>
-  select(landmark_id, utme, utmn) |>
-  mutate(landmark_id = str_replace_all(landmark_id, " ", "_"))
-
+#that was created on line #331
 
 # this is to put the landmark coordinates where there are NAs in the utme and utmn columns
 DF_lions_data <- DF_lions_clans |>
