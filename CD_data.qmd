@@ -519,49 +519,40 @@ Now we have to deal with the weird coordinates that will create fuckall points.
 
 ex: Reach_Out_and_Touch_Mound
 ```{r Weird coordinates}
-
 DB_locations_for_MCPs_clean <- DB_locations_for_MCPs |>
   
-  #Change the utme coordinates that are 111111 and 1111111
-  left_join(DF_lndmk %>% 
-      select(landmark_id, utme_new = utme, utmn_new = utmn) %>% 
+  left_join(DF_lndmk %>%
+      select(landmark_id, utme_new = utme, utmn_new = utmn) %>%
       distinct(landmark_id, .keep_all = TRUE),
     by = "landmark_id") |>
+  
+  # fix utme/utmn when they have placeholder values (11111, 111111, 1111111)
   mutate(
-    utme = if_else(utme == "11111", utme_new, utme),
-    utmn = if_else(utme == "11111", utmn_new, utmn)) |>
-  mutate(
-    utme = if_else(utme == "111111", utme_new, utme),
-    utmn = if_else(utme == "111111", utmn_new, utmn)) |>
-  mutate(
-    utme = if_else(utme == "1111111", utme_new, utme),
-    utmn = if_else(utme == "1111111", utmn_new, utmn)) |>
-  # now same for the 1111111 in utmn:
+    utme = if_else(utme %in% c("11111", "111111", "1111111"), utme_new, utme),
+    utmn = if_else(utmn %in% c("11111", "111111", "1111111"), utmn_new, utmn)) |>
+  
+  # fix utme/utmn when utmn is "1111111"
   mutate(
     utme = if_else(utmn == "1111111", utme_new, utme),
     utmn = if_else(utmn == "1111111", utmn_new, utmn)) |>
-  # change when I have 0s in utme and/or utmn
-  mutate(
-    utme = if_else(landmark_id == "Stupid_Tree" & utme == 0 & utmn == 0,
-                   utme_new, utme),
-    utmn = if_else(landmark_id == "Stupid_Tree" & utme == 0 & utmn == 0,
-                   utmn_new, utmn)) |>
-   mutate(
-    utme = if_else(landmark_id == "Rhino_Tree" & utme == 0 & utmn == 0,
-                   utme_new, utme),
-    utmn = if_else(landmark_id == "Rhino_Tree" & utme == 0 & utmn == 0,
-                   utmn_new, utmn)) |>
-   mutate(
-    utme = if_else(landmark_id == "Saga_Lugga_Crossing" & utme == 0 & utmn == 0,
-                   utme_new, utme),
-    utmn = if_else(landmark_id == "Saga_Lugga_Crossing" & utme == 0 & utmn == 0,
-                   utmn_new, utmn)) |>
   
-  #change the utme value of 98... of Fig_Tree_Lugga_-_Top
+  # fix utme/utmn when both are 0 for specific landmarks
   mutate(
-    utme = if_else(landmark_id == "Fig_Tree_Lugga_-_Top" & utme == 9840057, utme_new, utme),
-    utmn = if_else(landmark_id == "Fig_Tree_Lugga_-_Top" & utme == 9840057, utmn_new, utmn)) |>
-  # now we remove the utme and utmn new columns
+    utme = if_else(
+      landmark_id %in% c("Stupid_Tree", "Rhino_Tree", "Saga_Lugga_Crossing") &
+        utme == 0 & utmn == 0,
+      utme_new, utme),
+    utmn = if_else(
+      landmark_id %in% c("Stupid_Tree", "Rhino_Tree", "Saga_Lugga_Crossing") &
+        utme == 0 & utmn == 0,
+      utmn_new, utmn)) |>
+  
+  # fix specific 98... value for Fig_Tree_Lugga_-_Top
+  mutate(
+    utme = if_else(landmark_id == "Fig_Tree_Lugga_-_Top" & utme == "9840057", utme_new, utme),
+    utmn = if_else(landmark_id == "Fig_Tree_Lugga_-_Top" & utme == "9840057", utmn_new, utmn)) |>
+  
+  # drop the helper columns
   select(-utme_new, -utmn_new) |>
   
   # change the airstrip_den utme and utmn value with a comma
@@ -578,55 +569,24 @@ DB_locations_for_MCPs_clean <- DB_locations_for_MCPs |>
  # change the session t99585 and t60813 and swap 4 and 7 in utme
   mutate(
     utme = if_else(
-      landmark_id == "Stupid_Tree" & utme == "476966",
-      sub("^47", "74", utme),
-      utme)) |>
-  mutate(
-    utme = if_else(
-      landmark_id == "Green_Den" & utme == "477420",
+      landmark_id %in% c("Stupid_Tree", "Green_Den") & grepl("^47", utme),
       sub("^47", "74", utme),
       utme)) |>
   
   #same for session t116873, t116658 and t54139 (change 5 and 7)
    mutate(
     utme = if_else(
-      landmark_id == "Croton_Island-East_Edge" & utme == "570527",
+      landmark_id %in% c("Croton_Island-East_Edge", "Cow_Tree", "Hi_Step_X") & grepl("^57", utme),
       sub("^57", "75", utme),
       utme)) |>
-  mutate(
-    utme = if_else(
-      landmark_id == "Cow_Tree" & utme == "570804",
-      sub("^57", "75", utme),
-      utme)) |>
-  mutate(
-    utme = if_else(
-      landmark_id == "Hi_Step_X" & utme == "573282",
-      sub("^57", "75", utme),
-      utme)) #|>
-
-
-
-
-
 
   #remove the last digit of a 7 digit utme
   mutate(
-    utme = if_else(
-      landmark_id == "Stupid_Tree" & nchar(as.character(utme)) == 7,
-      substr(as.character(utme), 1, 6),   # keep only first 6 digits
-      as.character(utme))) |>
- 
+  utme = if_else(
+    landmark_id %in% c("Big_Sky_Den", "The_Observatory", "BB_X") & nchar(utme) == 7,
+    substr(utme, 1, 6),   # keep only first 6 digits
+    utme)) |>
   
-  # same for the TWin_trees values
-  mutate(
-    utme = if_else(
-      landmark_id == "Twin_Trees",
-      sub(".*,(.*)$", "\\1", as.character(utme)),   # keep last number
-      as.character(utme)),
-    utmn = if_else(
-      landmark_id == "Twin_Trees",
-      sub(".*,(.*)$", "\\1", as.character(utmn)),   # same for utmn
-      as.character(utmn))) |>
   #for session t117205, add a 4 after the first 7, and session t111704 add a 5 after the 7
   mutate(
     utme = if_else(
@@ -638,47 +598,118 @@ DB_locations_for_MCPs_clean <- DB_locations_for_MCPs |>
       landmark_id == "Sunshine_Tree" & utme == "70360",
       sub("^7", "75", utme),
       utme)) |>
-
   
+  # remove the 2nd number 
+  mutate(
+  utme = if_else(
+    session %in% c("t112413", "t51456"),
+    paste0(substr(utme, 1, 1), substr(utme, 3, nchar(utme))),  # remove 2nd character
+    utme)) |>
+  
+  # remove all that is after the coma for both utme and utmn
+  mutate(
+    across(
+      c(utme, utmn),
+      ~ if_else(
+        landmark_id %in% c("Serena_Lodge", "Box_Crossing", "Surprise_X"),
+        sub(",.*", "", .x),   # keep only before first comma
+        .x))) |>
+  
+  # For this session "t49599" 
+  # 745095 8906 983
+  mutate(
+    utme = if_else(
+      session == "t49599",
+      substr(utme, 1, 6),   # keep only the first 6 characters
+      utme)) |>
+  mutate(
+    utmn = if_else(
+      session == "t49599",
+      paste0("9806", utmn),   # add 9806 before in utmn
+      utmn)) |>
+  
+  # keep just after the 2nd comma (t22224)
+  mutate(
+    utme = if_else(
+      session == "t22224",
+      sub(".*?,.*?,", "", utme),   # keep everything after 2nd comma
+      utme),
+    utmn = if_else(
+      session == "t22224",
+      sub(".*?,.*?,", "", utmn),
+      utmn)) |>
+  
+  #Get rid of the last digit
+   mutate(
+    utme = if_else(
+      session %in% c("t47831", "t49436", "t48055", "t111641", "t72442", "t57018", "t120547", "t115642"),   # replace with your session IDs
+      substr(utme, 1, nchar(utme) - 1),  # drop last character
+      utme)) |>
+  
+  # Now these have only 5 digits in utme, i will just remove them
+  filter(!session %in% c("t115558", "t49400", "t66664", "t74990")) |> #I will see later if I decide to look for the last digit or not 
+  
+  #take out the sessions with weird utmn (99 and 0)
+  filter(session != "t99428") |>
+  filter(session != "t54706") |>
   #take out the Low_Ranker's_Crossing cause utmn= utme
   filter(landmark_id != "Low_Ranker's_Crossing") |>
   
-  #change the utmn starting with 6 to 9
-  mutate(utmn = if_else(
-      grepl("^6", utmn),
-      sub("^6", "9", utmn),
+  # Keep only before the comma 
+  mutate(
+    utmn = if_else(
+      landmark_id %in% c("Uproar_Den", "Fig_Tree_Lodge", "Virginia_Maria_Crossing", "Three_Sisters", "Green_Den"),  #t60159
+      sub(",.*", "", utmn),   # keep before the first comma
       utmn)) |>
-  mutate(utmn = if_else(
-      grepl("^7", utmn),
-      sub("^7", "9", utmn),
+  
+  # Now keep all after the comma
+  mutate(
+    utmn = if_else(
+      landmark_id %in% c("Swakey_Tree"),
+      sub("^[^,]*,", "", utmn),   # remove everything up to the first comma
       utmn)) |>
-  #remove the 8th digit if there is one
-  mutate(utmn = if_else(
-      nchar(utmn) == 8,
-      substr(utmn, 1, 7),  # keep only the first 7 characters
-      utmn)) |>
-  #take out the session t54706 because utmn = 99 and the point is ~700m from the landmark
-  filter(session != "t54706") |>
-  filter(nchar(utmn) != 6)
+  
+  # remove all utmn of 6 and 8
+  filter(nchar(utmn) != 6) |>
+  filter(nchar(utmn) != 8) |>
 
-# i have 183 rows with weird coordinates, we will examine them...
-DF_check <- DB_locations_for_KDEs_clean |>
-  filter(nchar(utme) != 6 | nchar(utmn) != 7)
+  #change the utmn starting with 6 or 7 to 9
+  mutate(
+    utmn = if_else(
+      grepl("^[67]", utmn),   # starts with 6 or 7
+      sub("^[67]", "9", utmn),
+      utmn))
+    
+  
+```
 
-# for now, i will just take them out, to be able to visualize the points, but we will figure out what to do with it 
 
-DB_locations_for_KDEs_test <- DB_locations_for_KDEs_clean |> #DB_locations_for_KDEs_clean = 71751 rows
-  filter(!session %in% DF_check$session)
+
+
+
+To get utme and utmn values of + or - than 6 numbers:
+```{r Check}
+
+DB_check_utme <- DB_locations_for_MCPs_clean |>
+  filter(nchar(utme) != 6) # now it is 0
+
+DB_check_utmn <- DB_locations_for_MCPs_clean |>
+  filter(nchar(utmn) != 7) # now is 0
 
 ```
+
+
+
+
+
 
 Now we visualize to see if there are still weird outliers points:
 ```{r}
 # first convert in sf object :
-DB_locations_for_KDEs_test_sf <- st_as_sf(DB_locations_for_KDEs_test, coords = c("utme", "utmn"), crs = 32736)
+DB_locations_for_MCPs_sf <- st_as_sf(DB_locations_for_MCPs_clean, coords = c("utme", "utmn"), crs = 32736)
 
 # map to visualize
-mapview(DB_locations_for_KDEs_test_sf, xcol = "utme", ycol = "utmn", zcol = "category")
+mapview(DB_locations_for_MCPs_sf, xcol = "utme", ycol = "utmn")
 # this is to see the outliers
 
 ```
@@ -690,6 +721,7 @@ The points that looks like outliers:
 - s6974
 - s115706
 - s117340 
+
 
 
 #2. Shapefiles
