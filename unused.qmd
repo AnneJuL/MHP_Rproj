@@ -477,8 +477,8 @@ CD_data_prey <- merge(CD_for_map, PREY_dat_all, by = c("month", "year"))
 
 ```
 
-
 ## Data cleaning (GPS points):
+
 ```{r}
 DB_locations_for_KDEs_clean <- DB_locations_for_KDEs |>
   
@@ -606,3 +606,138 @@ DB_locations_for_KDEs_clean <- DB_locations_for_KDEs |>
   filter(session != "t54706") |>
   filter(nchar(utmn) != 6)
 ```
+
+
+
+## MCPs with only the dens locations (we decided to use all the GPS locations anytime a hyena was seen on their respective territory)
+```{r Individual MCPs for all clans}
+
+#for Serena South clan
+CD_sf_serenas <- CD_sf_wgs84 |>
+  filter(clan == "serenas")
+
+serenas_points <- as_Spatial(CD_sf_serenas$geometry)
+
+serenas_MCP <- mcp(serenas_points, percent = 95)
+
+
+
+# For Serena North clan
+CD_sf_serenan <- CD_sf_wgs84 |>
+  filter(clan == "serenan")
+
+serenan_points <- as_Spatial(CD_sf_serenan$geometry)
+
+serenan_MCP <- mcp(serenan_points, percent = 95)
+
+
+
+# For Happy Zebra clan 
+CD_sf_hz <- CD_sf_wgs84 |>
+  filter(clan == "happyzebra")
+
+hz_points <- as_Spatial(CD_sf_hz$geometry)
+
+hz_MCP <- mcp(hz_points, percent = 95)
+
+
+# For Talek clan 
+CD_sf_talek <- CD_sf_wgs84 |>
+  filter(clan == "talek")
+
+talek_points <- as_Spatial(CD_sf_talek$geometry)
+
+talek_MCP <- mcp(talek_points, percent = 95)
+
+```
+
+```{r Plots}
+plot(serenan_MCP)
+plot(serenas_MCP)
+plot(hz_MCP)
+plot(talek_MCP)
+
+```
+
+
+
+Long way to make the MCPs
+
+```{r Clan MCPs}
+
+#for Serena South clan
+CD_sf_serenas <- DB_AllGPS_sf_wgs84 |>
+  filter(clan == "serenas")
+
+serenas_points <- as_Spatial(CD_sf_serenas$geometry)
+
+serenas_MCP <- mcp(serenas_points, percent = 95)
+
+
+
+# For Serena North clan
+CD_sf_serenan <- DB_AllGPS_sf_wgs84 |>
+  filter(clan == "serenan")
+
+serenan_points <- as_Spatial(CD_sf_serenan$geometry)
+
+serenan_MCP <- mcp(serenan_points, percent = 95)
+
+
+
+# For Happy Zebra clan 
+CD_sf_hz <- DB_AllGPS_sf_wgs84 |>
+  filter(clan == "happyzebra")
+
+hz_points <- as_Spatial(CD_sf_hz$geometry)
+
+hz_MCP <- mcp(hz_points, percent = 95)
+
+
+# For Talek clan 
+CD_sf_talek <- DB_AllGPS_sf_wgs84 |>
+  filter(clan == "talek")
+
+talek_points <- as_Spatial(CD_sf_talek$geometry)
+
+talek_MCP <- mcp(talek_points, percent = 95)
+
+```
+
+```{r Visualization}
+
+plot(serenan_MCP)
+plot(serenas_MCP)
+plot(hz_MCP)
+plot(talek_MCP)
+
+```
+
+
+
+```{r}
+#grouping the mcps in a dataframe grouped by clans
+clan_MCPs <- rbind(serenan_MCP, talek_MCP, serenas_MCP, hz_MCP)
+
+#rename the ids :
+new_ids <- c("serenan", "talek", "serenas", "happyzebra")
+
+clan_MCPs <- sp::spChFIDs(clan_MCPs, new_ids)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

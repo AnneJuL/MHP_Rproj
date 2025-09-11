@@ -82,6 +82,9 @@ library(brms)
 library(glmmTMB) # to make RSF models
 
 
+library(purrr)
+
+
 #install.packages("glmmTMB")
 
 ```
@@ -91,21 +94,39 @@ Load data files
 ```{r Files}
 #shapefiles created in CD_data
 
+DB_AllGPS_sf <- sf::st_read("data_files/DB_AllGPS_sf.shp")
+
+DB_AllGPS_sf_wgs84 <- sf::st_read("data_files/DB_AllGPS_sf_wgs84.shp")
+
 #This one has the coordinates as UTM x, y
 CD_sf <- sf::st_read("data_files/CD_sf.shp")
-CD_sf
 
 #This one has the coordinates in lat long, to use with leaflet
 CD_sf_wgs84 <- sf::st_read("data_files/CD_sf_wgs84.shp")
-CD_sf_wgs84
 
 # FOr the lions data
 CD_sf_lions <- sf::st_read("data_files/CD_sf_lions.shp")
-CD_sf_lions
 
 CD_lions_wgs84 <- sf::st_read("data_files/CD_lions_wgs84.shp")
 
 ```
+
+Let's get rid of Migration den in happy zebra that is not at all at the right place:
+```{r Data manip}
+
+DB_AllGPS_sf_wgs84 <- DB_AllGPS_sf_wgs84 |>
+  filter(lndmrk_ != "Migration_Den")
+
+CD_sf_wgs84 <- CD_sf_wgs84 |>
+  mutate(clan = str_replace_all(clan, "\\.", "")) |>
+  filter(lndmrk_ != "Migration_Den")
+
+  
+
+
+
+```
+
 
 
 # 1. Data visualisation
@@ -281,6 +302,152 @@ htmlwidgets::saveWidget(CD_leaflet_lion2, file = "Maps/CD_leaflet_lion2.html", s
 
 ```
 
+
+### v) All GPS points map
+
+```{r}
+
+pal2 <- colorFactor(palette = "viridis", domain = DB_AllGPS_sf_wgs84$clan)
+
+AllGPS_leaflet <- leaflet() |>
+  addTiles()
+
+# Add points grouped by Year, colored by Clan
+years2 <- unique(DB_AllGPS_sf_wgs84$year)
+
+for (yr in years2) {
+  data_year <- DB_AllGPS_sf_wgs84 |> filter(year == yr)
+  
+AllGPS_leaflet <- AllGPS_leaflet |>
+    addCircleMarkers(data = data_year,
+                     color = ~pal2(clan),
+                     group = yr,
+                     radius = 1,
+                     fillOpacity = 0.8,
+                     popup = ~paste("Year:", year, "<br>", "Clan:", clan, "<br>", "session", "<br>", "lndmrk_"))
+}
+
+#Add toggle control for years
+AllGPS_leaflet <- AllGPS_leaflet |>
+  
+  addLayersControl(
+    baseGroups = years2,
+    overlayGroups = c("Year"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) |>
+  
+  addScaleBar(position = "bottomleft", options = list(metric = TRUE, imperial = FALSE)) |>
+  
+  #Add a legend
+  addLegend("bottomright", pal = pal2, values = DB_AllGPS_sf_wgs84$clan,
+            title = "Clan", opacity = 1)
+  
+
+AllGPS_leaflet  # display the map
+
+#save
+htmlwidgets::saveWidget(AllGPS_leaflet, file = "Maps/AllGPS_leaflet.html", selfcontained = TRUE)
+
+```
+
+Location map:
+
+```{r}
+
+pal3 <- colorFactor(c("red", "blue", "yellow", "green", "pink", "black", "orange"), domain = DB_AllGPS_sf_wgs84$locatin)
+
+location_leaflet <- leaflet() |>
+  addTiles()
+
+# Add points grouped by Year, colored by Clan
+years2 <- unique(DB_AllGPS_sf_wgs84$year)
+
+for (yr in years2) {
+  data_year <- DB_AllGPS_sf_wgs84 |> filter(year == yr)
+  
+location_leaflet <- location_leaflet |>
+    addCircleMarkers(data = data_year,
+                     color = ~pal3(locatin),
+                     group = yr,
+                     radius = 1,
+                     fillOpacity = 0.8,
+                     popup = ~paste("Year:", year, "<br>", "Clan:", clan, "<br>", "Session", session, "<br>", "Landmark", lndmrk_))
+}
+
+#Add toggle control for years
+location_leaflet <- location_leaflet |>
+  
+  addLayersControl(
+    baseGroups = years2,
+    overlayGroups = c("Year"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) |>
+  
+  addScaleBar(position = "bottomleft", options = list(metric = TRUE, imperial = FALSE)) |>
+  
+  #Add a legend
+  addLegend("bottomright", pal = pal3, values = DB_AllGPS_sf_wgs84$locatin,
+            title = "Location", opacity = 1)
+  
+
+location_leaflet  # display the map
+
+#save
+htmlwidgets::saveWidget(location_leaflet, file = "Maps/location_leaflet.html", selfcontained = TRUE)
+
+```
+
+
+```{r}
+
+pal_clan <- colorFactor(palette = "viridis", domain = DB_AllGPS_sf_wgs84$clan)
+
+location_leaflet2 <- leaflet() |>
+  addTiles()
+
+loc <- unique(DB_AllGPS_sf_wgs84$locatin)
+
+for (lc in loc) {
+  data_loc <- DB_AllGPS_sf_wgs84 |> filter(locatin == lc)
+  
+location_leaflet2 <- location_leaflet2 |>
+    addCircleMarkers(data = data_loc,
+                     color = ~pal_clan(clan),
+                     group = lc,
+                     radius = 1,
+                     fillOpacity = 1,
+                     popup = ~paste("Year:", year,"<br>",
+                                    "Clan:", clan, "<br>", 
+                                    "Name:", lndmrk_))
+}
+
+#Add toggle control for years
+location_leaflet2 <- location_leaflet2 |>
+  
+  addLayersControl(
+    baseGroups = loc,
+    overlayGroups = c("Location"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) |>
+  
+  addScaleBar(position = "bottomleft", options = list(metric = TRUE, imperial = FALSE)) |>
+  
+  #Add a legend
+  addLegend("bottomright", pal = pal_clan, values = DB_AllGPS_sf_wgs84$clan,
+            title = "Clan", opacity = 1)
+  
+
+location_leaflet2  # display the map
+
+
+#save
+htmlwidgets::saveWidget(location_leaflet2, file = "Maps/location_leaflet2.html", selfcontained = TRUE)
+
+```
+
+
+
+
 # 2. KDE by clans
 
 Here we will make KDE, kernel density estimation.
@@ -413,83 +580,117 @@ To make our RSF model, we need to create random points of potential locations of
 
 Also, we are using the 95% MCP, so that it removes the 5% of outlier points.
 
-```{r Individual MCPs for all clans}
+## 3.1. Individual MCPs
 
-#for Serena South clan
-CD_sf_serenas <- CD_sf_wgs84 |>
-  filter(clan == "serenas")
+Here is the MCPs for all hyenas locations
+```{r Clan MCPs}
 
-serenas_points <- as_Spatial(CD_sf_serenas$geometry)
+# Convert all points to sp (adehabitatHR works with sp)
+CD_sp <- as(DB_AllGPS_sf_wgs84, "Spatial")
 
-serenas_MCP <- mcp(serenas_points, percent = 95)
+# Create MCPs grouped by clan
+mcp_clan <- mcp(CD_sp[, "clan"], percent = 95)
 
+# Convert back to sf
+mcp_clan_sf <- st_as_sf(mcp_clan)
 
-
-# For Serena North clan
-CD_sf_serenan <- CD_sf_wgs84 |>
-  filter(clan == "serenan")
-
-serenan_points <- as_Spatial(CD_sf_serenan$geometry)
-
-serenan_MCP <- mcp(serenan_points, percent = 95)
-
-
-
-# For Happy Zebra clan 
-CD_sf_hz <- CD_sf_wgs84 |>
-  filter(clan == "happyzebra")
-
-hz_points <- as_Spatial(CD_sf_hz$geometry)
-
-hz_MCP <- mcp(hz_points, percent = 95)
-
-
-# For Happy Zebra clan 
-CD_sf_talek <- CD_sf_wgs84 |>
-  filter(clan == "talek")
-
-talek_points <- as_Spatial(CD_sf_talek$geometry)
-
-talek_MCP <- mcp(talek_points, percent = 95)
-
+# Inspect
+plot(st_geometry(mcp_clan_sf), col = NA, border = "red")
 ```
 
-```{r Plots}
-plot(serenan_MCP)
-plot(serenas_MCP)
-plot(hz_MCP)
-plot(talek_MCP)
-
-```
-
-```{r MCPs grouped by clans}
-
-#grouping the mcps in a dataframe grouped by clans
-clan_MCPs <- rbind(serenan_MCP, talek_MCP, serenas_MCP, hz_MCP)
-
-#rename the ids :
-new_ids <- c("serenan", "talek", "serenas", "happyzebra")
-
-clan_MCPs <- sp::spChFIDs(clan_MCPs, new_ids)
-
-```
+Save
 
 ```{r}
 
-plot(clan_MCPs)
+# Save the dataframe
+mcp_clan_sf <- sf::st_write(mcp_clan_sf, "data_files/mcp_clan_sf.shp")
 
 ```
 
-```{r Plot+leaflet}
 
-clan_MCPs_dataframe <- as.data.frame(clan_MCPs)
+## 3.2. Yearly MCPs
+```{r Yearly MCPs}
+
+# Create an ID that combines clan and year
+CD_sp$clan_year <- paste(CD_sp$clan, CD_sp$year, sep = "_")
+
+# Count points per clan-year
+counts <- as.data.frame(table(CD_sp$clan_year))
+
+# Keep only groups with >= 5 relocations
+valid_ids <- counts$Var1[counts$Freq >= 5]
+
+# Filter points
+CD_sp_valid <- CD_sp[CD_sp$clan_year %in% valid_ids, ]
+
+# Run MCP only on valid groups
+mcp_clan_year <- mcp(CD_sp_valid[, "clan_year"], percent = 95)
+mcp_clan_year_sf <- st_as_sf(mcp_clan_year)
+
+
+
+# Split IDs back into clan and year
+mcp_clan_year_sf <- mcp_clan_year_sf |>
+  mutate(clan = sub("_(\\d+)$", "", row.names(mcp_clan_year_sf)),
+         year = sub(".*_", "", row.names(mcp_clan_year_sf)))
+
+
+```
+
+```{r Excluded vs included}
+
+# Count relocations per clan-year
+counts <- as.data.frame(table(CD_sp$clan_year)) %>%
+  rename(clan_year = Var1, n_points = Freq)
+
+# Split clan and year into separate columns
+counts <- counts %>%
+  mutate(
+    clan = sub("_(\\d+)$", "", clan_year),
+    year = sub(".*_", "", clan_year)
+  )
+
+# Show which groups are valid / invalid
+counts <- counts %>%
+  mutate(valid = ifelse(n_points >= 5, "yes", "no"))
+
+# View excluded groups
+excluded <- counts %>% filter(valid == "no")
+
+# View valid groups
+included <- counts %>% filter(valid == "yes")
+
+excluded
+included
+
+```
+
+
+Save
+```{r Save}
+
+#  Save the dataframe
+mcp_clan_year_sf <- sf::st_write(mcp_clan_year_sf, "data_files/mcp_clan_year_sf.shp")
+
+```
+
+
+## 3.3. Plots
+
+```{r Dataframe}
+# Transform into a dataframe:
+clan_MCPs_dataframe <- as.data.frame(mcp_clan_sf)
 
 clan_MCPs_dataframe <- rownames_to_column(clan_MCPs_dataframe, "clan")
 
+```
+
+
+```{r Single MCP}
 MCPs_clan <- unique(clan_MCPs_dataframe$clan)
 
-MCPs_plot <- CD_leaflet_year |>
-  addPolygons(data = clan_MCPs,
+MCPs_plot <- AllGPS_leaflet |>
+  addPolygons(data = mcp_clan_sf,
               color = "red",
               fillColor = "none",
               weight = 2,
@@ -499,13 +700,74 @@ MCPs_plot
 
 ```
 
-Save
 
-```{r}
+```{r Yearly MCPs}
 
-clan_MCPs <- sf::st_write(clan_MCPs, "data_files/clan_MCPs.shp")
+# Start with an empty leaflet map
+yearly_MCPs_plot <- leaflet() |> addTiles()
+
+# Define your clan palette
+pal2 <- colorFactor(palette = "viridis", domain = DB_AllGPS_sf_wgs84$clan)
+
+# Get all years
+years2 <- sort(unique(DB_AllGPS_sf_wgs84$year))
+
+# Loop over years to add both points and MCPs under the same baseGroup (year)
+for (yr in years2) {
+  
+  # Points for this year
+  points_year <- DB_AllGPS_sf_wgs84 |> filter(year == yr)
+  
+  # MCP polygons for this year
+  mcp_year <- mcp_clan_year_sf |> filter(year == yr)
+
+  # Add MCP polygons
+  yearly_MCPs_plot <- yearly_MCPs_plot |>
+    addPolygons(data = mcp_year,
+                color = "red",
+                fillColor = "none",
+                weight = 2,
+                fillOpacity = 0.05,
+                popup = ~paste("Year:", year, "<br>", "Clan:", clan),
+                group = paste0("Year ", yr))  # same group = year
+  
+  # Add points
+  yearly_MCPs_plot <- yearly_MCPs_plot |>
+    addCircleMarkers(data = points_year,
+                     color = ~pal2(clan),
+                     radius = 1,
+                     fillOpacity = 0.8,
+                     popup = ~paste("Year:", year, "<br>", "Clan:", clan, "<br>", "Session:", session, "<br>", "Landmark:", lndmrk_),
+                     group = paste0("Year ", yr))  # group = year
+}
+
+# Add **radio button style toggle** for years
+yearly_MCPs_plot <- yearly_MCPs_plot |>
+  addLayersControl(
+    baseGroups = paste0("Year ", years2),  # radio button style
+    options = layersControlOptions(collapsed = FALSE)
+  ) |>
+  
+  addScaleBar(position = "bottomleft", options = list(metric = TRUE, imperial = FALSE)) |>
+  
+  addLegend("bottomright", pal = pal2, values = DB_AllGPS_sf_wgs84$clan,
+            title = "Clan", opacity = 1)
+
+
+yearly_MCPs_plot
+
 
 ```
+
+
+Save
+```{r}
+
+# Save the map
+htmlwidgets::saveWidget(yearly_MCPs_plot, file = "Maps/yearly_MCPs_plot.html", selfcontained = TRUE)
+```
+
+
 
 #4. Creating the RSF
 
@@ -521,40 +783,116 @@ The `random_points()` function will create this `case\_` variable that will be u
 
 ```{r Random_points}
 
-#Convert your sf object to a data frame with coordinates:
-CD_sf_wgs84_df <- CD_sf_wgs84 |>
-  mutate(long = sf::st_coordinates(geometry)[,1],
-         lat = sf::st_coordinates(geometry)[,2])
+#Convert your sf object to a data frame with coordinates: 
 
+CD_sf_wgs84_df <- CD_sf_wgs84 |> mutate(long = sf::st_coordinates(geometry)[,1], lat = sf::st_coordinates(geometry)[,2]) 
 
-#Change the CD_sf_wgs84 into a track_xy object
-presence_track <- make_track(CD_sf_wgs84_df, long, lat, crs = 4326, id = clan, year = year)
+#Change the CD_sf_wgs84 into a track_xy object 
 
-#serenan presence_track
-presence_track_serenan <- presence_track |>
-  subset(id == "serenan")
+presence_track <- make_track(CD_sf_wgs84_df, long, lat, crs = 4326, id = clan, year = year) 
 
-#serenan presence_track
-presence_track_serenas <- presence_track |>
-  subset(id == "serenas")
+# change id for clan 
+presence_track <- presence_track |>
+  rename(clan = id)
 
-#serenan presence_track
-presence_track_hz <- presence_track |>
-  subset(id == "happyzebra")
+mcp_clan_sf <- mcp_clan_sf |>
+  rename(clan = id)
 
-#serenan presence_track
-presence_track_talek <- presence_track |>
-  subset(id == "talek")
+#serenan 
+presence_track_serenan <- presence_track |> subset(clan == "serenan") 
 
+#serenas 
+presence_track_serenas <- presence_track |> subset(clan == "serenas") 
 
-#creating the dataset to use in RSF after (for all clans)
-rp_clans_KDE <- random_points(CD_clan_KDE_mapdata, n=4000, presence = presence_track)
+#hz 
+presence_track_hz <- presence_track |> subset(clan == "happyzebra") 
 
-#Visualising
-plot(rp_clans_KDE)
+#talek 
+presence_track_talek <- presence_track |> subset(clan == "talek") 
 
+#creating the dataset to use in RSF after (for all clans) 
+
+rp_clans_MCP <- random_points(mcp_clan_sf, n=4000, presence = presence_track) 
+
+#Visualising 
+plot(rp_clans_MCP)
 
 ```
+
+```{r}
+# Function to generate 10 random points per used point
+generate_randoms <- function(pres_row, mcp_polygons, n = 10) {
+  # Extract clan from the presence row
+  clan_i <- pres_row$clan
+  
+  # Subset MCP polygon for this clan
+  mcp_i <- mcp_polygons %>% filter(clan == clan_i)
+  
+  # Generate n random points inside this MCP
+  rand_pts <- random_points(mcp_i, n = n, presence = pres_row)
+  
+  # Convert to sf
+  rand_sf <- st_as_sf(rand_pts, coords = c("x_", "y_"), crs = st_crs(mcp_polygons))
+  
+  # Add back metadata
+  rand_sf <- rand_sf %>%
+    mutate(clan = clan_i,
+           year = pres_row$year,  # still keep year from the presence row
+           case_ = 0)
+  
+  return(rand_sf)
+}
+
+# Apply over all presence points
+CD_rp_data <- map_dfr(1:nrow(presence_track), ~ generate_randoms(presence_track[.x, ], mcp_clan_sf, n = 10))
+
+# Combine presences (case_ = 1) and randoms (case_ = 0)
+CD_all_data <- bind_rows(
+  presence_track %>%
+    st_as_sf(coords = c("x_", "y_"), crs = st_crs(mcp_clan_sf)) %>%
+    mutate(case_ = 1),
+  CD_rp_data
+)
+```
+
+
+```{r}
+
+# visualizing
+pal_case <- colorFactor(palette = c("red", "blue"),
+                        domain = CD_all_data$case_)
+
+rp_CD_map <-
+leaflet() |>
+  addTiles() |>
+
+  # Then plot random (case_ == 0) in blue (will appear on top)
+  addCircleMarkers(
+    data = CD_all_data[CD_all_data$case_ == 0, ],
+    color = "blue", radius = 3, fillOpacity = 0.6,
+    group = "Random"
+  ) |>
+   # First plot used (case_ == 1) in red
+  addCircleMarkers(
+    data = CD_all_data[CD_all_data$case_ == 1, ],
+    color = "red", radius = 3, fillOpacity = 0.6,
+    group = "Used"
+  ) |>
+  addLayersControl(
+    overlayGroups = c("Used", "Random"),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+
+
+# Save the map
+htmlwidgets::saveWidget(rp_CD_map, file = "Maps/rp_CD_map.html", selfcontained = TRUE)
+
+```
+
+
+
+
+
 
 Here, I will do rp datasets for the 4 clans, to make sure the number of available points is 10 times de number of used points.
 
@@ -604,6 +942,12 @@ Save the rp dataset:
 rp_ind_clans_KDE <- st_write(rp_ind_clans_KDE, "data_files/rp_ind_clans_KDE.shp")
 
 ```
+
+
+
+
+
+
 
 ## 4.2. Plots
 
