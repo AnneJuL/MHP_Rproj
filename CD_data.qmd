@@ -125,7 +125,7 @@ CD_loc_data <- tblLandmarks |>
   select(landmark_id, utme, utmn, date) |>
   drop_na(utme, utmn)
 
-#write_csv2(CD_loc_data, "data_files/CD_loc_data.csv")
+
 CD_loc_data_date <- CD_loc_data |>
   separate(date, c("date1", "date2"), sep = " ", remove=FALSE) |>
   separate(date2, c("year", "month", "day"), sep = "-", remove = F) |>
@@ -213,6 +213,14 @@ CD_for_map <- CD_data_full |>
 CD_for_map$year <- as.character(CD_for_map$year)
 
 str(CD_for_map)
+
+```
+
+
+Save this dataset:
+```{r}
+
+write_csv2(CD_for_map, "data_files/CD_for_map.csv")
 
 ```
 
@@ -1261,8 +1269,10 @@ sf_df_m_to_talek <- st_as_sf(CD_for_map, coords = c("utme", "utmn"), crs = 32736
 #Save the sf dataframe - can only do it once when it is not created before
 CD_sf2 <- sf::st_write(sf_df_m_to_talek, "data_files/CD_sf_talekm.shp")
 
-CD_sf2 <- sf::st_read("data_files/CD_sf_talekm.shp")
+# transform in WGS84
+CD_sf2_wgs84 <- st_transform(CD_sf2, crs = 4326)
 
+CD_sf2_wgs84 <- sf::st_write(CD_sf2_wgs84, "data_files/CD_sf_talekm_wgs84.shp")
 
 ```
 

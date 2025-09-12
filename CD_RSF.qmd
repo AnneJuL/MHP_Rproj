@@ -92,22 +92,33 @@ library(purrr)
 Load data files
 
 ```{r Files}
+
 #shapefiles created in CD_data
 
+# To make the MCP:
 DB_AllGPS_sf <- sf::st_read("data_files/DB_AllGPS_sf.shp")
-
 DB_AllGPS_sf_wgs84 <- sf::st_read("data_files/DB_AllGPS_sf_wgs84.shp")
 
-#This one has the coordinates as UTM x, y
-CD_sf <- sf::st_read("data_files/CD_sf.shp")
 
-#This one has the coordinates in lat long, to use with leaflet
+
+# Communal den GPS points:
+CD_sf <- sf::st_read("data_files/CD_sf.shp")
 CD_sf_wgs84 <- sf::st_read("data_files/CD_sf_wgs84.shp")
 
-# FOr the lions data
-CD_sf_lions <- sf::st_read("data_files/CD_sf_lions.shp")
+CD_sf_talekm <- sf::st_read("data_files/CD_sf_talekm.shp")
+CD_sf_talekm_wgs84 <- sf::st_read("data_files/CD_sf_talekm_wgs84.shp")
 
+
+
+
+# Lions data
+CD_sf_lions <- sf::st_read("data_files/CD_sf_lions.shp")
 CD_lions_wgs84 <- sf::st_read("data_files/CD_lions_wgs84.shp")
+
+
+
+
+
 
 ```
 
@@ -121,7 +132,9 @@ CD_sf_wgs84 <- CD_sf_wgs84 |>
   mutate(clan = str_replace_all(clan, "\\.", "")) |>
   filter(lndmrk_ != "Migration_Den")
 
-  
+CD_sf_talekm_wgs84 <- CD_sf_talekm_wgs84 |> 
+  mutate(clan = str_replace_all(clan, "\\.", "")) |>
+  filter(lndmrk_ != "Migration_Den")
 
 
 
@@ -596,6 +609,11 @@ mcp_clan_sf <- st_as_sf(mcp_clan)
 
 # Inspect
 plot(st_geometry(mcp_clan_sf), col = NA, border = "red")
+
+# change id for clan 
+mcp_clan_sf <- mcp_clan_sf |>
+  rename(clan = id)
+
 ```
 
 Save
@@ -789,14 +807,8 @@ CD_sf_wgs84_df <- CD_sf_wgs84 |> mutate(long = sf::st_coordinates(geometry)[,1],
 
 #Change the CD_sf_wgs84 into a track_xy object 
 
-presence_track <- make_track(CD_sf_wgs84_df, long, lat, crs = 4326, id = clan, year = year) 
+presence_track <- make_track(CD_sf_wgs84_df, long, lat, crs = 4326, clan = clan, year = year) 
 
-# change id for clan 
-presence_track <- presence_track |>
-  rename(clan = id)
-
-mcp_clan_sf <- mcp_clan_sf |>
-  rename(clan = id)
 
 #serenan 
 presence_track_serenan <- presence_track |> subset(clan == "serenan") 
@@ -810,8 +822,12 @@ presence_track_hz <- presence_track |> subset(clan == "happyzebra")
 #talek 
 presence_track_talek <- presence_track |> subset(clan == "talek") 
 
-#creating the dataset to use in RSF after (for all clans) 
 
+# make MCP valid:
+mcp_clan_sf <- st_make_valid(mcp_clan_sf)
+
+
+#creating the dataset to use in RSF after (for all clans) 
 rp_clans_MCP <- random_points(mcp_clan_sf, n=4000, presence = presence_track) 
 
 #Visualising 
@@ -851,11 +867,15 @@ CD_all_data <- bind_rows(
   presence_track %>%
     st_as_sf(coords = c("x_", "y_"), crs = st_crs(mcp_clan_sf)) %>%
     mutate(case_ = 1),
-  CD_rp_data
-)
+  CD_rp_data)
+
+
+
+
 ```
 
 
+### 4.1.1. Plots
 ```{r}
 
 # visualizing
@@ -890,116 +910,9 @@ htmlwidgets::saveWidget(rp_CD_map, file = "Maps/rp_CD_map.html", selfcontained =
 ```
 
 
-
-
-
-
-Here, I will do rp datasets for the 4 clans, to make sure the number of available points is 10 times de number of used points.
-
-```{r RP Per clans}
-
-#First, how much CD locations have each clans
-sum(CD_sf_wgs84$clan == "serenan") # 93
-sum(CD_sf_wgs84$clan == "serenas") # 92
-sum(CD_sf_wgs84$clan == "happyzebra") # 83
-sum(CD_sf_wgs84$clan == "talek") # 90
-
-#serenan
-rp_serenan_KDE <- CD_clan_KDE_mapdata |>
-  subset(clan == "serenan") |>
-  random_points(n=930, presence = presence_track_serenan) |>
-  mutate(clan = "serenan")
-
-
-#serenas
-rp_serenas_KDE <- CD_clan_KDE_mapdata |>
-  subset(clan == "serenas") |>
-  random_points(n=920, presence = presence_track_serenas) |>
-  mutate(clan = "serenas")
-
-#happyzebra
-rp_hz_KDE <- CD_clan_KDE_mapdata |>
-  subset(clan == "happyzebra") |>
-  random_points(n = 830, presence = presence_track_hz) |>
-  mutate(clan = "happyzebra")
-
-#talek
-rp_talek_KDE <- CD_clan_KDE_mapdata |>
-  subset(clan == "talek") |>
-  random_points(n = 900, presence = presence_track_talek) |>
-  mutate(clan = "talek")
-
-
-# combine all of the clans:
-rp_ind_clans_KDE <- rbind(rp_serenan_KDE, rp_serenas_KDE, rp_hz_KDE, rp_talek_KDE)
-
-```
-
-Save the rp dataset:
-
-```{r Save}
-
-rp_ind_clans_KDE <- st_write(rp_ind_clans_KDE, "data_files/rp_ind_clans_KDE.shp")
-
-```
-
-
-
-
-
-
-
-## 4.2. Plots
-
-```{r Plot leaflet}
-
-pal_clans_rp <- colorFactor(palette = "magma", domain = rp_ind_clans_KDE$clan)
-
-rp_KDEs_plot <- CD_clan_KDE_map |>
-  addCircleMarkers(data = rp_ind_clans_KDE,
-                   lat = rp_ind_clans_KDE$y_,
-                   lng = rp_ind_clans_KDE$x_,
-                   group = rp_ind_clans_KDE$clan,
-                   color = ~pal_clans_rp(clan),
-                   radius = 1,
-                   fillOpacity = 0.1)
-
-rp_KDEs_plot
-
-htmlwidgets::saveWidget(rp_KDEs_plot, file = "Maps/rp_KDEs_plot.html", selfcontained = TRUE)
-
-```
-
-## 4.3. RSF dataset
-
-Now, we can put `rp_ind_clans_KDE` into a dataset. This will be to use in the RSF.
-
-```{r RSF_data}
-
-#change the case_ column to used and 0 = not used, 1 = used
-RSF_data <- rp_ind_clans_KDE |>
-  rename(used = case_) |>
-  mutate(used = case_when(used == 'TRUE' ~ 1,
-                          TRUE ~ 0))
-
-
-```
-
-```{r Save}
-
-#RSF_data <- sf::st_write(RSF_data, "data_files/rp_ind_clans_KDE.shp")
-RSF_data <- st_read("data_files/rp_ind_clans_KDE.dbf")
-
-```
-
-
-###Talek distance 
+## 4.2. Distance to talek
 
 ```{r}
-
-RSF_data_sf <- st_as_sf(RSF_data[, c("x_", "y_", "clan", "used")], coords = c("x_", "y_"), crs = 4326)
-
-mapview(RSF_data_sf)
 
 talek_center <- data.frame(
   lon = 35.216423,
@@ -1010,15 +923,42 @@ talek_center <- data.frame(
 talek_sf <- st_as_sf(talek_center, coords = c("lon", "lat"), crs = 4326)
 
 # Transform to a projected CRS in meters (UTM zone for this area: 36S)
-RSF_data_sf_m <- st_transform(RSF_data_sf, 32736)    # EPSG 32736 = WGS 84 / UTM zone 36S
+CD_all_data_tl <- st_transform(CD_all_data, 32736)    # EPSG 32736 = WGS 84 / UTM zone 36S
 talek_sf_m <- st_transform(talek_sf, 32736)
 
-# Calculate distances in meters
-RSF_data_sf$dist_talek_m <- as.numeric(st_distance(RSF_data_sf_m, talek_sf_m))
 
-mapview(RSF_data_sf)
+# Calculate distances in meters
+CD_all_data$dst_tl <- as.numeric(st_distance(CD_all_data_tl, talek_sf_m))
+
 
 ```
+
+
+
+
+
+
+## 4.3. RSF dataset
+
+Now, we can put `rp_ind_clans_KDE` into a dataset. This will be to use in the RSF.
+
+```{r RSF_data}
+
+#change the case_ column to used and 0 = not used, 1 = used
+CD_RSF_data <- CD_all_data |>
+  rename(used = case_)
+
+str(CD_RSF_data)
+
+```
+
+```{r Save}
+
+CD_RSF_data <- sf::st_write(CD_RSF_data, "data_files/CD_RSF_data.shp")
+#CD_RSF_data <- st_read("data_files/CD_RSF_data.shp")
+
+```
+
 
 
 ## 4.2. RSF model
@@ -1027,7 +967,21 @@ I will separate the Talek points with the triangle ones, so that I can make a mo
 
 ```{r}
 
-rsf1 <- fit_rsf(RSF_data, formula = used ~ 1)
+rsf1 <- fit_rsf(CD_RSF_data, formula = used ~ year)
 summary(rsf1)
+plot(rsf1)
 
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+

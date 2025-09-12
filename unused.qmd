@@ -607,9 +607,8 @@ DB_locations_for_KDEs_clean <- DB_locations_for_KDEs |>
   filter(nchar(utmn) != 6)
 ```
 
-
-
 ## MCPs with only the dens locations (we decided to use all the GPS locations anytime a hyena was seen on their respective territory)
+
 ```{r Individual MCPs for all clans}
 
 #for Serena South clan
@@ -658,8 +657,6 @@ plot(hz_MCP)
 plot(talek_MCP)
 
 ```
-
-
 
 Long way to make the MCPs
 
@@ -713,8 +710,6 @@ plot(talek_MCP)
 
 ```
 
-
-
 ```{r}
 #grouping the mcps in a dataframe grouped by clans
 clan_MCPs <- rbind(serenan_MCP, talek_MCP, serenas_MCP, hz_MCP)
@@ -725,6 +720,92 @@ new_ids <- c("serenan", "talek", "serenas", "happyzebra")
 clan_MCPs <- sp::spChFIDs(clan_MCPs, new_ids)
 
 ```
+
+
+
+Here, I will do rp datasets for the 4 clans, to make sure the number of available points is 10 times de number of used points.
+
+```{r RP Per clans}
+
+#First, how much CD locations have each clans
+sum(CD_sf_wgs84$clan == "serenan") # 93
+sum(CD_sf_wgs84$clan == "serenas") # 92
+sum(CD_sf_wgs84$clan == "happyzebra") # 83
+sum(CD_sf_wgs84$clan == "talek") # 90
+
+#serenan
+rp_serenan_KDE <- CD_clan_KDE_mapdata |>
+  subset(clan == "serenan") |>
+  random_points(n=930, presence = presence_track_serenan) |>
+  mutate(clan = "serenan")
+
+
+#serenas
+rp_serenas_KDE <- CD_clan_KDE_mapdata |>
+  subset(clan == "serenas") |>
+  random_points(n=920, presence = presence_track_serenas) |>
+  mutate(clan = "serenas")
+
+#happyzebra
+rp_hz_KDE <- CD_clan_KDE_mapdata |>
+  subset(clan == "happyzebra") |>
+  random_points(n = 830, presence = presence_track_hz) |>
+  mutate(clan = "happyzebra")
+
+#talek
+rp_talek_KDE <- CD_clan_KDE_mapdata |>
+  subset(clan == "talek") |>
+  random_points(n = 900, presence = presence_track_talek) |>
+  mutate(clan = "talek")
+
+
+# combine all of the clans:
+rp_ind_clans_KDE <- rbind(rp_serenan_KDE, rp_serenas_KDE, rp_hz_KDE, rp_talek_KDE)
+
+```
+
+Save the rp dataset:
+
+```{r Save}
+
+rp_ind_clans_KDE <- st_write(rp_ind_clans_KDE, "data_files/rp_ind_clans_KDE.shp")
+
+```
+
+
+
+
+
+```{r Plot leaflet}
+
+pal_clans_rp <- colorFactor(palette = "magma", domain = rp_ind_clans_KDE$clan)
+
+rp_KDEs_plot <- CD_clan_KDE_map |>
+  addCircleMarkers(data = rp_ind_clans_KDE,
+                   lat = rp_ind_clans_KDE$y_,
+                   lng = rp_ind_clans_KDE$x_,
+                   group = rp_ind_clans_KDE$clan,
+                   color = ~pal_clans_rp(clan),
+                   radius = 1,
+                   fillOpacity = 0.1)
+
+rp_KDEs_plot
+
+htmlwidgets::saveWidget(rp_KDEs_plot, file = "Maps/rp_KDEs_plot.html", selfcontained = TRUE)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
