@@ -721,8 +721,6 @@ clan_MCPs <- sp::spChFIDs(clan_MCPs, new_ids)
 
 ```
 
-
-
 Here, I will do rp datasets for the 4 clans, to make sure the number of available points is 10 times de number of used points.
 
 ```{r RP Per clans}
@@ -772,10 +770,6 @@ rp_ind_clans_KDE <- st_write(rp_ind_clans_KDE, "data_files/rp_ind_clans_KDE.shp"
 
 ```
 
-
-
-
-
 ```{r Plot leaflet}
 
 pal_clans_rp <- colorFactor(palette = "magma", domain = rp_ind_clans_KDE$clan)
@@ -802,8 +796,131 @@ htmlwidgets::saveWidget(rp_KDEs_plot, file = "Maps/rp_KDEs_plot.html", selfconta
 
 
 
+# 2. KDE by clans
+
+Here we will make KDE, kernel density estimation.
+
+## 2.1. Functions
+
+First, the functions we'll need: - Function to calculate the KDE - Function to calculate the KDE with two groups (clan per year example) - Function to extract the KDE values and then use it in maps.
+
+```{r Function KDE for clans}
+# Function to calculate 50% KDE for each clan
+calculate_kde <- function(df) {
+  hr_kde(df, levels = 0.95)
+}
+```
+
+```{r Function KDE for yearly}
+
+# Function to calculate 95% KDE for each group
+calculate_kde_2 <- function(df) {
+  if (nrow(df) < 5) return(NULL)  # Skip if not enough points
+  df <- df[complete.cases(df$x_, df$y_), ]  # Remove rows with missing coords
+  if (nrow(df) < 5) return(NULL)  # Skip again if filtering removed too much
+  tryCatch(
+    hr_kde(df, levels = 0.95)
+  )
+}
+
+```
+
+```{r Function to extract KDE}
+# Extract KDE polygons and convert to sf format
+extract_kde_sf <- function(kde_result) {
+  kde_sf <- st_as_sf(hr_isopleths(kde_result))# Convert KDE to sf polygons
+  return(kde_sf)
+}
+```
+
+## 2.2. Data
+
+```{r Organising data}
+# First step : make_track
+# Make_track the GPS dataset to then be able to calculate KDE
+
+#Preparing the df for it:
+CD_sf_df <- CD_sf_wgs84 |>
+  # before making the make_track, we need to separate geometry column into long and lat 
+  mutate(long = sf::st_coordinates(geometry)[,1],
+         lat = sf::st_coordinates(geometry)[,2]) |>
+  mutate(row.id = row_number()) |>
+  dplyr::select(year, long, lat, clan, row.id)
 
 
+#Now we make the make_track
+CD_KDE_df <- CD_sf_df |>
+  #Now we do the make_track function
+  make_track(long, lat, crs = 4326, id = clan) |>
+  #Now rename the id column just because
+  rename(clan = id) |>
+  mutate(row.id = CD_sf_df$row.id)
+  
+#Now to add year:
+CD_year <- CD_sf_df |>
+  dplyr::select(year, row.id) |>
+  st_drop_geometry()
+
+#merge year with the lat long df:
+CD_KDE_df <- CD_KDE_df |>
+  left_join(CD_year, by = "row.id")
+```
+
+```{r Split}
+# Split the dataset per Clan
+CD_KDE_list <- split(CD_KDE_df, CD_KDE_df$clan)
+
+# Split the db into clan and year
+CD_KDE_list_cy <- split(CD_KDE_df, CD_KDE_df$year)
+```
+
+## 2.3. Clans' KDE
+
+```{r Calculating}
+CD_clan_KDE <- lapply(CD_KDE_list, calculate_kde)
+```
+
+```{r Extract+Data manip}
+CD_clan_KDE_data <- lapply(CD_clan_KDE, extract_kde_sf)
+
+CD_clan_KDE_mapdata <- do.call(rbind, CD_clan_KDE_data)
+
+CD_clan_KDE_mapdata <- tibble::rownames_to_column(CD_clan_KDE_mapdata, "clan")
+
+
+
+```
+
+```{r Leaflet}
+
+pal_clan <- colorFactor(palette = "viridis", domain = CD_clan_KDE_mapdata$clan)
+
+
+CD_clan_KDE_map <- CD_leaflet_year |>
+  addPolygons(data = CD_clan_KDE_mapdata,
+              fillColor = ~pal_clan(CD_clan_KDE_mapdata$clan),
+              color = "black",
+              weight = 1,
+              fillOpacity = 0.8,
+              label = ~paste("Clan:", clan)) 
+  
+
+CD_clan_KDE_map
+
+```
+
+```{r}
+htmlwidgets::saveWidget(CD_clan_KDE_map, file = "Maps/CD_clan_KDE_map.html", selfcontained = TRUE)
+```
+
+Save KDEs data
+
+```{r Save}
+
+CD_clan_KDE_mapdata <- sf::st_write(CD_clan_KDE_mapdata, "data_files/CD_clan_KDE.shp")
+
+
+```
 
 
 

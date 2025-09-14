@@ -117,10 +117,11 @@ CD_lions_wgs84 <- sf::st_read("data_files/CD_lions_wgs84.shp")
 
 
 
-
+CD_all_data <- sf::st_read("data_files/CD_all_data.shp")
 
 
 ```
+
 
 Let's get rid of Migration den in happy zebra that is not at all at the right place:
 ```{r Data manip}
@@ -135,6 +136,12 @@ CD_sf_wgs84 <- CD_sf_wgs84 |>
 CD_sf_talekm_wgs84 <- CD_sf_talekm_wgs84 |> 
   mutate(clan = str_replace_all(clan, "\\.", "")) |>
   filter(lndmrk_ != "Migration_Den")
+
+
+
+CD_lions_wgs84 <- CD_lions_wgs84 |> 
+  mutate(clan = str_replace_all(clan, "\\.", "")) |>
+  select(-date)
 
 
 
@@ -460,457 +467,164 @@ htmlwidgets::saveWidget(location_leaflet2, file = "Maps/location_leaflet2.html",
 
 
 
-
-# 2. KDE by clans
-
-Here we will make KDE, kernel density estimation.
-
-## 2.1. Functions
-
-First, the functions we'll need: - Function to calculate the KDE - Function to calculate the KDE with two groups (clan per year example) - Function to extract the KDE values and then use it in maps.
-
-```{r Function KDE for clans}
-# Function to calculate 50% KDE for each clan
-calculate_kde <- function(df) {
-  hr_kde(df, levels = 0.95)
-}
-```
-
-```{r Function KDE for yearly}
-
-# Function to calculate 95% KDE for each group
-calculate_kde_2 <- function(df) {
-  if (nrow(df) < 5) return(NULL)  # Skip if not enough points
-  df <- df[complete.cases(df$x_, df$y_), ]  # Remove rows with missing coords
-  if (nrow(df) < 5) return(NULL)  # Skip again if filtering removed too much
-  tryCatch(
-    hr_kde(df, levels = 0.95)
-  )
-}
-
-```
-
-```{r Function to extract KDE}
-# Extract KDE polygons and convert to sf format
-extract_kde_sf <- function(kde_result) {
-  kde_sf <- st_as_sf(hr_isopleths(kde_result))# Convert KDE to sf polygons
-  return(kde_sf)
-}
-```
-
-## 2.2. Data
-
-```{r Organising data}
-# First step : make_track
-# Make_track the GPS dataset to then be able to calculate KDE
-
-#Preparing the df for it:
-CD_sf_df <- CD_sf_wgs84 |>
-  # before making the make_track, we need to separate geometry column into long and lat 
-  mutate(long = sf::st_coordinates(geometry)[,1],
-         lat = sf::st_coordinates(geometry)[,2]) |>
-  mutate(row.id = row_number()) |>
-  dplyr::select(year, long, lat, clan, row.id)
-
-
-#Now we make the make_track
-CD_KDE_df <- CD_sf_df |>
-  #Now we do the make_track function
-  make_track(long, lat, crs = 4326, id = clan) |>
-  #Now rename the id column just because
-  rename(clan = id) |>
-  mutate(row.id = CD_sf_df$row.id)
-  
-#Now to add year:
-CD_year <- CD_sf_df |>
-  dplyr::select(year, row.id) |>
-  st_drop_geometry()
-
-#merge year with the lat long df:
-CD_KDE_df <- CD_KDE_df |>
-  left_join(CD_year, by = "row.id")
-```
-
-```{r Split}
-# Split the dataset per Clan
-CD_KDE_list <- split(CD_KDE_df, CD_KDE_df$clan)
-
-# Split the db into clan and year
-CD_KDE_list_cy <- split(CD_KDE_df, CD_KDE_df$year)
-```
-
-## 2.3. Clans' KDE
-
-```{r Calculating}
-CD_clan_KDE <- lapply(CD_KDE_list, calculate_kde)
-```
-
-```{r Extract+Data manip}
-CD_clan_KDE_data <- lapply(CD_clan_KDE, extract_kde_sf)
-
-CD_clan_KDE_mapdata <- do.call(rbind, CD_clan_KDE_data)
-
-CD_clan_KDE_mapdata <- tibble::rownames_to_column(CD_clan_KDE_mapdata, "clan")
-
-
-
-```
-
-```{r Leaflet}
-
-pal_clan <- colorFactor(palette = "viridis", domain = CD_clan_KDE_mapdata$clan)
-
-
-CD_clan_KDE_map <- CD_leaflet_year |>
-  addPolygons(data = CD_clan_KDE_mapdata,
-              fillColor = ~pal_clan(CD_clan_KDE_mapdata$clan),
-              color = "black",
-              weight = 1,
-              fillOpacity = 0.8,
-              label = ~paste("Clan:", clan)) 
-  
-
-CD_clan_KDE_map
-
-```
-
-```{r}
-htmlwidgets::saveWidget(CD_clan_KDE_map, file = "Maps/CD_clan_KDE_map.html", selfcontained = TRUE)
-```
-
-Save KDEs data
-
-```{r Save}
-
-CD_clan_KDE_mapdata <- sf::st_write(CD_clan_KDE_mapdata, "data_files/CD_clan_KDE.shp")
-
-
-```
-
-# 3. MCP by clans
-
-To make our RSF model, we need to create random points of potential locations of where the hyenas could have denned. To do that, we first need to know the extent of the clans' territory, and so we will calculate the MCP (Minimum Convex Polygon) for each clan. An MCP calculate the area that an animal uses. The MCP essentially draws a polygon around all the points where an animal has been observed.
-
-Also, we are using the 95% MCP, so that it removes the 5% of outlier points.
-
-## 3.1. Individual MCPs
-
-Here is the MCPs for all hyenas locations
-```{r Clan MCPs}
-
-# Convert all points to sp (adehabitatHR works with sp)
-CD_sp <- as(DB_AllGPS_sf_wgs84, "Spatial")
-
-# Create MCPs grouped by clan
-mcp_clan <- mcp(CD_sp[, "clan"], percent = 95)
-
-# Convert back to sf
-mcp_clan_sf <- st_as_sf(mcp_clan)
-
-# Inspect
-plot(st_geometry(mcp_clan_sf), col = NA, border = "red")
-
-# change id for clan 
-mcp_clan_sf <- mcp_clan_sf |>
-  rename(clan = id)
-
-```
-
-Save
-
-```{r}
-
-# Save the dataframe
-mcp_clan_sf <- sf::st_write(mcp_clan_sf, "data_files/mcp_clan_sf.shp")
-
-```
-
-
-## 3.2. Yearly MCPs
-```{r Yearly MCPs}
-
-# Create an ID that combines clan and year
-CD_sp$clan_year <- paste(CD_sp$clan, CD_sp$year, sep = "_")
-
-# Count points per clan-year
-counts <- as.data.frame(table(CD_sp$clan_year))
-
-# Keep only groups with >= 5 relocations
-valid_ids <- counts$Var1[counts$Freq >= 5]
-
-# Filter points
-CD_sp_valid <- CD_sp[CD_sp$clan_year %in% valid_ids, ]
-
-# Run MCP only on valid groups
-mcp_clan_year <- mcp(CD_sp_valid[, "clan_year"], percent = 95)
-mcp_clan_year_sf <- st_as_sf(mcp_clan_year)
-
-
-
-# Split IDs back into clan and year
-mcp_clan_year_sf <- mcp_clan_year_sf |>
-  mutate(clan = sub("_(\\d+)$", "", row.names(mcp_clan_year_sf)),
-         year = sub(".*_", "", row.names(mcp_clan_year_sf)))
-
-
-```
-
-```{r Excluded vs included}
-
-# Count relocations per clan-year
-counts <- as.data.frame(table(CD_sp$clan_year)) %>%
-  rename(clan_year = Var1, n_points = Freq)
-
-# Split clan and year into separate columns
-counts <- counts %>%
-  mutate(
-    clan = sub("_(\\d+)$", "", clan_year),
-    year = sub(".*_", "", clan_year)
-  )
-
-# Show which groups are valid / invalid
-counts <- counts %>%
-  mutate(valid = ifelse(n_points >= 5, "yes", "no"))
-
-# View excluded groups
-excluded <- counts %>% filter(valid == "no")
-
-# View valid groups
-included <- counts %>% filter(valid == "yes")
-
-excluded
-included
-
-```
-
-
-Save
-```{r Save}
-
-#  Save the dataframe
-mcp_clan_year_sf <- sf::st_write(mcp_clan_year_sf, "data_files/mcp_clan_year_sf.shp")
-
-```
-
-
-## 3.3. Plots
-
-```{r Dataframe}
-# Transform into a dataframe:
-clan_MCPs_dataframe <- as.data.frame(mcp_clan_sf)
-
-clan_MCPs_dataframe <- rownames_to_column(clan_MCPs_dataframe, "clan")
-
-```
-
-
-```{r Single MCP}
-MCPs_clan <- unique(clan_MCPs_dataframe$clan)
-
-MCPs_plot <- AllGPS_leaflet |>
-  addPolygons(data = mcp_clan_sf,
-              color = "red",
-              fillColor = "none",
-              weight = 2,
-              fillOpacity = 0.05)
-  
-MCPs_plot
-
-```
-
-
-```{r Yearly MCPs}
-
-# Start with an empty leaflet map
-yearly_MCPs_plot <- leaflet() |> addTiles()
-
-# Define your clan palette
-pal2 <- colorFactor(palette = "viridis", domain = DB_AllGPS_sf_wgs84$clan)
-
-# Get all years
-years2 <- sort(unique(DB_AllGPS_sf_wgs84$year))
-
-# Loop over years to add both points and MCPs under the same baseGroup (year)
-for (yr in years2) {
-  
-  # Points for this year
-  points_year <- DB_AllGPS_sf_wgs84 |> filter(year == yr)
-  
-  # MCP polygons for this year
-  mcp_year <- mcp_clan_year_sf |> filter(year == yr)
-
-  # Add MCP polygons
-  yearly_MCPs_plot <- yearly_MCPs_plot |>
-    addPolygons(data = mcp_year,
-                color = "red",
-                fillColor = "none",
-                weight = 2,
-                fillOpacity = 0.05,
-                popup = ~paste("Year:", year, "<br>", "Clan:", clan),
-                group = paste0("Year ", yr))  # same group = year
-  
-  # Add points
-  yearly_MCPs_plot <- yearly_MCPs_plot |>
-    addCircleMarkers(data = points_year,
-                     color = ~pal2(clan),
-                     radius = 1,
-                     fillOpacity = 0.8,
-                     popup = ~paste("Year:", year, "<br>", "Clan:", clan, "<br>", "Session:", session, "<br>", "Landmark:", lndmrk_),
-                     group = paste0("Year ", yr))  # group = year
-}
-
-# Add **radio button style toggle** for years
-yearly_MCPs_plot <- yearly_MCPs_plot |>
-  addLayersControl(
-    baseGroups = paste0("Year ", years2),  # radio button style
-    options = layersControlOptions(collapsed = FALSE)
-  ) |>
-  
-  addScaleBar(position = "bottomleft", options = list(metric = TRUE, imperial = FALSE)) |>
-  
-  addLegend("bottomright", pal = pal2, values = DB_AllGPS_sf_wgs84$clan,
-            title = "Clan", opacity = 1)
-
-
-yearly_MCPs_plot
-
-
-```
-
-
-Save
-```{r}
-
-# Save the map
-htmlwidgets::saveWidget(yearly_MCPs_plot, file = "Maps/yearly_MCPs_plot.html", selfcontained = TRUE)
-```
-
-
-
-#4. Creating the RSF
+# 2. Creating the RSF
 
 ALSO, we need to control for the obs effort (some years field team would go more on obs vs other years/season). I guess with year as a random, and month as a covariable, it does control for this...
 
-##4.1. Prepare data
-
-The first step in doing a RSF, is to create random points on the territory. To do so, I will take the clans' KDEs as the home range of the clans, and generate random points in the polygons created. This will create a database of used and available points. The used points are the den locations known, and the available are probably all the adjacent points on the territory.
-
-I need to determine how many points I want to sample for each points used. For example, 5 points per used points.
-
-The `random_points()` function will create this `case\_` variable that will be use in the RSF later.
-
-```{r Random_points}
-
-#Convert your sf object to a data frame with coordinates: 
-
-CD_sf_wgs84_df <- CD_sf_wgs84 |> mutate(long = sf::st_coordinates(geometry)[,1], lat = sf::st_coordinates(geometry)[,2]) 
-
-#Change the CD_sf_wgs84 into a track_xy object 
-
-presence_track <- make_track(CD_sf_wgs84_df, long, lat, crs = 4326, clan = clan, year = year) 
 
 
-#serenan 
-presence_track_serenan <- presence_track |> subset(clan == "serenan") 
+# 3. Covariables
 
-#serenas 
-presence_track_serenas <- presence_track |> subset(clan == "serenas") 
+Now we need to create covariables.
 
-#hz 
-presence_track_hz <- presence_track |> subset(clan == "happyzebra") 
+We have a lot of covariables to create. Here is the list:
 
-#talek 
-presence_track_talek <- presence_track |> subset(clan == "talek") 
+-   Distance to human community\*
+
+-   Distance to last and closest lion sighting\*
+
+-   Distance/number (don't think we have that) of cattle\*
+
+-   Land cover (bush vs plains, etc.)\*
+
+-   Altitude\*
+
+-   Distance to edge of territory\*
+
+-   Distance to water\*
+
+-   Amount of time (maybe in number of days?) that the den was used (in interaction with distance to humans?
+
+-   Rank of the females at the den
+
+In more of a post-hoc thing:
+-   Number of cubs at dens
 
 
-# make MCP valid:
-mcp_clan_sf <- st_make_valid(mcp_clan_sf)
 
-
-#creating the dataset to use in RSF after (for all clans) 
-rp_clans_MCP <- random_points(mcp_clan_sf, n=4000, presence = presence_track) 
-
-#Visualising 
-plot(rp_clans_MCP)
+```{r}
 
 ```
 
+
+## 3.1. Distance to Talek
+
+The first thing is to tell R to use python to be able to get the 20+ year historical satellite imagery data from Google Earth Engine, since it is the easiest way to get the Talek town borders for all those years. That API (Application Programming Interface) is only available in Python or JavaScript. So I have to tell R to use Python to have access to that.
+  --> An API is like a menu at a restaurant - it lists the things you can ask for (functions, data) and tells the kitchen (the software) how to prepare them for you.
+  --> Google Earth Engine API = the set of commands you can send to Google's satellite image servers to request data (e.g., "give me all Landsat images for Talek Town in 2005").
+
+
+### TALEK 
 ```{r}
-# Function to generate 10 random points per used point
-generate_randoms <- function(pres_row, mcp_polygons, n = 10) {
-  # Extract clan from the presence row
-  clan_i <- pres_row$clan
+# 1. Location of Talek town, Maasai Mara
+talek_point <- ee$Geometry$Point(35.216423, -1.442912) #talek town center
+talek_roi <- talek_point$buffer(600) # 5 km radius
+```
+
+Here is a test for year 2020:
+```{r}
+# 2 - Function for built-up detection
+get_yearly_builtup <- function(year) {
+  s2 <- ee$ImageCollection("COPERNICUS/S2_SR")$
+    filterBounds(talek_roi)$
+    filterDate(sprintf("%d-01-01", year), sprintf("%d-12-31", year))$
+    filter(ee$Filter$lt("CLOUDY_PIXEL_PERCENTAGE", 20))$
+    median()
   
-  # Subset MCP polygon for this clan
-  mcp_i <- mcp_polygons %>% filter(clan == clan_i)
+  # Calculate NDBI (built-up) and NDVI (vegetation)
+  ndbi <- s2$normalizedDifference(c("B11", "B8"))
+  ndvi <- s2$normalizedDifference(c("B8", "B4"))
   
-  # Generate n random points inside this MCP
-  rand_pts <- random_points(mcp_i, n = n, presence = pres_row)
+  # Threshold: built-up AND low vegetation
+  builtup_mask <- ndbi$gt(0.2)$And(ndvi$lt(0.3))
   
-  # Convert to sf
-  rand_sf <- st_as_sf(rand_pts, coords = c("x_", "y_"), crs = st_crs(mcp_polygons))
+  # Mask original image
+  builtup <- builtup_mask$selfMask()
   
-  # Add back metadata
-  rand_sf <- rand_sf %>%
-    mutate(clan = clan_i,
-           year = pres_row$year,  # still keep year from the presence row
-           case_ = 0)
+  # Reduce to vectors inside ROI
+  vectors <- builtup$reduceToVectors(
+    geometry = talek_roi,
+    geometryType = "polygon",
+    reducer = ee$Reducer$countEvery(),
+    scale = 10,
+    maxPixels = 1e10
+  )
   
-  return(rand_sf)
+  vectors$set("year", year)
 }
 
-# Apply over all presence points
-CD_rp_data <- map_dfr(1:nrow(presence_track), ~ generate_randoms(presence_track[.x, ], mcp_clan_sf, n = 10))
+# --- Year of interest ---
+year <- 2020
 
-# Combine presences (case_ = 1) and randoms (case_ = 0)
-CD_all_data <- bind_rows(
-  presence_track %>%
-    st_as_sf(coords = c("x_", "y_"), crs = st_crs(mcp_clan_sf)) %>%
-    mutate(case_ = 1),
-  CD_rp_data)
+# --- Generate polygons for that year ---
+builtup_polygons <- get_yearly_builtup(year)
 
-
+# --- Visualization parameters ---
+Map$centerObject(talek_roi, zoom = 15)
+Map$addLayer(talek_roi, list(color = "blue"), "Talek ROI") +
+  Map$addLayer(builtup_polygons, list(color = "red"), paste("Built-up", year))
 
 
 ```
 
 
-### 4.1.1. Plots
+
+
 ```{r}
+# 2. Function to mask clouds and detect buildings
+mask_builtup <- function(image) {
+  # Calculate NDBI
+  swir <- image$select("B11")
+  nir <- image$select("B8")
+  ndbi <- swir$subtract(nir)$divide(swir$add(nir))
+  
+  # Built-up mask (adjust threshold if needed)
+  builtup_mask <- ndbi$gt(0.2) # try lowering to 0.1 if empty
+  
+  # Apply mask but keep it as a single-band image for vectorizing
+  return(builtup_mask$rename("builtup"))
+}
 
-# visualizing
-pal_case <- colorFactor(palette = c("red", "blue"),
-                        domain = CD_all_data$case_)
-
-rp_CD_map <-
-leaflet() |>
-  addTiles() |>
-
-  # Then plot random (case_ == 0) in blue (will appear on top)
-  addCircleMarkers(
-    data = CD_all_data[CD_all_data$case_ == 0, ],
-    color = "blue", radius = 3, fillOpacity = 0.6,
-    group = "Random"
-  ) |>
-   # First plot used (case_ == 1) in red
-  addCircleMarkers(
-    data = CD_all_data[CD_all_data$case_ == 1, ],
-    color = "red", radius = 3, fillOpacity = 0.6,
-    group = "Used"
-  ) |>
-  addLayersControl(
-    overlayGroups = c("Used", "Random"),
-    options = layersControlOptions(collapsed = FALSE)
+# 3. Function to get yearly composite and vector polygons
+get_yearly_builtup <- function(year) {
+  start <- sprintf("%d-01-01", year)
+  end <- sprintf("%d-12-31", year)
+  
+  yearly_img <- ee$ImageCollection("COPERNICUS/S2_SR")$
+    filterBounds(region)$
+    filterDate(start, end)$
+    map(mask_builtup)$
+    max() # union of all built-up pixels in the year
+  
+  # Ensure projection
+  yearly_img <- yearly_img$setDefaultProjection("EPSG:4326", NULL, 10)
+  
+  # Vectorize built-up areas
+  vectors <- yearly_img$reduceToVectors(
+    geometry = region,
+    geometryType = "polygon",
+    scale = 10,
+    crs = "EPSG:4326",
+    maxPixels = 1e10
   )
+  
+  vectors_sf <- ee_as_sf(vectors)
+  vectors_sf$year <- year
+  return(vectors_sf)
+}
 
+# 4. Run for a range of years
+years <- 2021:2023
+builtup_polygons <- do.call(rbind, lapply(years, get_yearly_builtup))
 
-# Save the map
-htmlwidgets::saveWidget(rp_CD_map, file = "Maps/rp_CD_map.html", selfcontained = TRUE)
-
+# 5. Save shapefile
+st_write(builtup_polygons, "talek_builtup_yearly.shp", delete_dsn = TRUE)
 ```
 
 
-## 4.2. Distance to talek
+
+
+### Distance to talek calculation
 
 ```{r}
 
@@ -935,47 +649,96 @@ CD_all_data$dst_tl <- as.numeric(st_distance(CD_all_data_tl, talek_sf_m))
 
 
 
+## 5.2. Lions
+
+I want to calculate the distance from the den location points to the closest lion sighting.
+
+```{r}
 
 
-
-## 4.3. RSF dataset
-
-Now, we can put `rp_ind_clans_KDE` into a dataset. This will be to use in the RSF.
-
-```{r RSF_data}
-
-#change the case_ column to used and 0 = not used, 1 = used
-CD_RSF_data <- CD_all_data |>
-  rename(used = case_)
-
-str(CD_RSF_data)
 
 ```
+
+
+
+
+
+# 6. RSF
+
+Now, we can use `CD_all_data` in the RSF.
+
+```{r RSF data}
+
+CD_RSF_data <- CD_all_data |>
+  rename(case = case_)
+  
+```
+
 
 ```{r Save}
 
 CD_RSF_data <- sf::st_write(CD_RSF_data, "data_files/CD_RSF_data.shp")
-#CD_RSF_data <- st_read("data_files/CD_RSF_data.shp")
+CD_RSF_data <- st_read("data_files/CD_RSF_data.shp")
 
 ```
 
 
 
-## 4.2. RSF model
+## 6.1. RSF model
 
 I will separate the Talek points with the triangle ones, so that I can make a model with the Talek town borders as a variable.
 
 ```{r}
 
-rsf1 <- fit_rsf(CD_RSF_data, formula = used ~ year)
+rsf1 <- fit_rsf(CD_RSF_data, formula = used ~ 1 + (1|year) + (1|clan), 
+                family = binomial)
+
+
+
 summary(rsf1)
 plot(rsf1)
 
 ```
 
+With brms:
+```{r brms}
+
+
+brm_RSF <- brm(case_ ~ 1 + (1|clan) + (1|year),
+               data = CD_RSF_data, 
+               family = bernoulli(),
+               cores = 4, 
+               chains = 4)
+
+
+```
 
 
 
+## 6.2. Distance to Talek model
+```{r brms tlaek model}
+CD_RSF_data_tl <- CD_RSF_data |>
+  filter(clan == "talek")
+
+
+brm_RSF_tl <- brm(case ~ dst_tl + year + (1|year),
+                  data = CD_RSF_data_tl, 
+                  family = bernoulli(),
+                  cores = 4, 
+                  chains = 4)
+
+brm_RSF_tl <- readRDS("brms_models/brm_RSF_tl.rds")
+
+```
+
+
+```{r}
+
+summary(brm_RSF_tl)
+plot(conditional_effects(brm_RSF_tl), points = T)
+
+
+```
 
 
 
