@@ -122,8 +122,8 @@ CD_all_data <- sf::st_read("data_files/CD_all_data.shp")
 
 ```
 
-
 Let's get rid of Migration den in happy zebra that is not at all at the right place:
+
 ```{r Data manip}
 
 
@@ -142,331 +142,9 @@ CD_lions_wgs84 <- CD_lions_wgs84 |>
 
 ```
 
-
-
-# 1. Data visualisation
-
-## 1.1. Maps
-
-Now let's try to create a map...
-
-### i) Base map (mapview)
-
-Mapview is just to see real quick what the points look like.
-
-```{r Mapviews}
-
-#According to year
-mapview(CD_sf, xcol = "utme", ycol = "utmn", zcol = "year")
-
-
-# According to clan 
-mapview(CD_sf, xcol = "utme", ycol = "utmn", zcol = "clan")
-
-
-```
-
-### ii) Basemap (leaflet)
-
-Leaflet is a bit more complex than mapview and can get you more options for mapping.
-
-We will create a basemap for starter: - Leaflet tile : draws the map tiles. There are numerous types of map tiles. - Layers Control: Leaflet has a nice little control that allows your users to control which layers they see on your map
-
-```{r Leaflet per year}
-
-pal <- colorFactor(palette = "viridis", domain = CD_sf_wgs84$clan)
-
-CD_leaflet_inter <- leaflet() |>
-  addTiles()
-
-# Add points grouped by Year, colored by Clan
-years <- unique(CD_sf_wgs84$year)
-
-for (yr in years) {
-  data_year <- CD_sf_wgs84 |> filter(year == yr)
-  
-CD_leaflet_inter <- CD_leaflet_inter |>
-    addCircleMarkers(data = data_year,
-                     color = ~pal(clan),
-                     group = yr,
-                     radius = 3,
-                     fillOpacity = 0.8,
-                     popup = ~paste("Year:", year, "<br>", "Clan:", clan))
-}
-
-#Add toggle control for years
-CD_leaflet_inter <- CD_leaflet_inter |>
-  
-  addLayersControl(
-    baseGroups = years,
-    overlayGroups = c("Year"),
-    options = layersControlOptions(collapsed = FALSE)
-  ) |>
-  
-  addScaleBar(position = "bottomleft", options = list(metric = TRUE, imperial = FALSE)) |>
-  
-  #Add a legend
-  addLegend("bottomright", pal = pal, values = CD_sf_wgs84$clan,
-            title = "Clan", opacity = 1)
-  
-
-CD_leaflet_inter  # display the map
-
-```
-
-Saving as a html file
-
-```{r}
-
-htmlwidgets::saveWidget(CD_leaflet_inter, file = "Maps/CD_leaflet_inter.html", selfcontained = TRUE)
-
-```
-
-### iii) Basemap clan (leaflet)
-
-This is the same map, but we invert the clan and year variables
-
-```{r Leaflet per clan}
-
-pal_year <- colorFactor(palette = "viridis", domain = CD_sf_wgs84$year)
-
-CD_leaflet_year <- leaflet() |>
-  addTiles()
-
-# Add points grouped by Year, colored by Clan
-clans <- unique(CD_sf_wgs84$clan)
-
-for (cl in clans) {
-  data_clan <- CD_sf_wgs84 |> filter(clan == cl)
-  
-CD_leaflet_year <- CD_leaflet_year |>
-    addCircleMarkers(data = data_clan,
-                     color = ~pal_year(year),
-                     group = cl,
-                     radius = 3,
-                     fillOpacity = 0.8,
-                     popup = ~paste("Year:", year,"<br>",
-                                    "Clan:", clan, "<br>", 
-                                    "Name:", lndmrk_))
-}
-
-#Add toggle control for years
-CD_leaflet_year <- CD_leaflet_year |>
-  
-  addLayersControl(
-    baseGroups = clans,
-    overlayGroups = c("Clan"),
-    options = layersControlOptions(collapsed = FALSE)
-  ) |>
-  
-  addScaleBar(position = "bottomleft", options = list(metric = TRUE, imperial = FALSE)) |>
-  
-  #Add a legend
-  addLegend("bottomright", pal = pal_year, values = CD_sf_wgs84$year,
-            title = "Year", opacity = 1)
-  
-
-CD_leaflet_year  # display the map
-
-```
-
-Save
-
-```{r}
-
-htmlwidgets::saveWidget(CD_leaflet_year, file = "Maps/CD_leaflet_year.html", selfcontained = TRUE)
-
-```
-
-### iv) Lions map
-
-```{r}
-
-str(CD_lions_wgs84)
-
-# Add lion points in red, sized by number of lions
-CD_leaflet_lion <- CD_leaflet_inter |>
-  addCircleMarkers(data = CD_lions_wgs84,
-                   color = "red",
-                   group = CD_lions_wgs84$year,
-                   radius = ~num_lin,   
-                   fillOpacity = 0.8,
-                   popup = ~paste("Year:", year, "<br>", 
-                                  "Number of lions:", num_lin, "<br>",
-                                  "Session ID:", session))
-
-CD_leaflet_lion
-
-
-# not sized by number:
-CD_leaflet_lion2 <- CD_leaflet_inter |>
-  addCircleMarkers(data = CD_lions_wgs84,
-                   color = "red",
-                   group = CD_lions_wgs84$year,
-                   fillOpacity = 0.8,
-                   radius = 1,
-                   popup = ~paste("Year:", year, "<br>", 
-                                  "Number of lions:", num_lin, "<br>",
-                                  "Session ID:", session))
-
-CD_leaflet_lion2
-
-#save
-htmlwidgets::saveWidget(CD_leaflet_lion2, file = "Maps/CD_leaflet_lion2.html", selfcontained = TRUE)
-
-
-```
-
-
-### v) All GPS points map
-
-```{r}
-
-pal2 <- colorFactor(palette = "viridis", domain = DB_AllGPS_sf_wgs84$clan)
-
-AllGPS_leaflet <- leaflet() |>
-  addTiles()
-
-# Add points grouped by Year, colored by Clan
-years2 <- unique(DB_AllGPS_sf_wgs84$year)
-
-for (yr in years2) {
-  data_year <- DB_AllGPS_sf_wgs84 |> filter(year == yr)
-  
-AllGPS_leaflet <- AllGPS_leaflet |>
-    addCircleMarkers(data = data_year,
-                     color = ~pal2(clan),
-                     group = yr,
-                     radius = 1,
-                     fillOpacity = 0.8,
-                     popup = ~paste("Year:", year, "<br>", "Clan:", clan, "<br>", "session", "<br>", "lndmrk_"))
-}
-
-#Add toggle control for years
-AllGPS_leaflet <- AllGPS_leaflet |>
-  
-  addLayersControl(
-    baseGroups = years2,
-    overlayGroups = c("Year"),
-    options = layersControlOptions(collapsed = FALSE)
-  ) |>
-  
-  addScaleBar(position = "bottomleft", options = list(metric = TRUE, imperial = FALSE)) |>
-  
-  #Add a legend
-  addLegend("bottomright", pal = pal2, values = DB_AllGPS_sf_wgs84$clan,
-            title = "Clan", opacity = 1)
-  
-
-AllGPS_leaflet  # display the map
-
-#save
-htmlwidgets::saveWidget(AllGPS_leaflet, file = "Maps/AllGPS_leaflet.html", selfcontained = TRUE)
-
-```
-
-Location map:
-
-```{r}
-
-pal3 <- colorFactor(c("red", "blue", "yellow", "green", "pink", "black", "orange"), domain = DB_AllGPS_sf_wgs84$locatin)
-
-location_leaflet <- leaflet() |>
-  addTiles()
-
-# Add points grouped by Year, colored by Clan
-years2 <- unique(DB_AllGPS_sf_wgs84$year)
-
-for (yr in years2) {
-  data_year <- DB_AllGPS_sf_wgs84 |> filter(year == yr)
-  
-location_leaflet <- location_leaflet |>
-    addCircleMarkers(data = data_year,
-                     color = ~pal3(locatin),
-                     group = yr,
-                     radius = 1,
-                     fillOpacity = 0.8,
-                     popup = ~paste("Year:", year, "<br>", "Clan:", clan, "<br>", "Session", session, "<br>", "Landmark", lndmrk_))
-}
-
-#Add toggle control for years
-location_leaflet <- location_leaflet |>
-  
-  addLayersControl(
-    baseGroups = years2,
-    overlayGroups = c("Year"),
-    options = layersControlOptions(collapsed = FALSE)
-  ) |>
-  
-  addScaleBar(position = "bottomleft", options = list(metric = TRUE, imperial = FALSE)) |>
-  
-  #Add a legend
-  addLegend("bottomright", pal = pal3, values = DB_AllGPS_sf_wgs84$locatin,
-            title = "Location", opacity = 1)
-  
-
-location_leaflet  # display the map
-
-#save
-htmlwidgets::saveWidget(location_leaflet, file = "Maps/location_leaflet.html", selfcontained = TRUE)
-
-```
-
-
-```{r}
-
-pal_clan <- colorFactor(palette = "viridis", domain = DB_AllGPS_sf_wgs84$clan)
-
-location_leaflet2 <- leaflet() |>
-  addTiles()
-
-loc <- unique(DB_AllGPS_sf_wgs84$locatin)
-
-for (lc in loc) {
-  data_loc <- DB_AllGPS_sf_wgs84 |> filter(locatin == lc)
-  
-location_leaflet2 <- location_leaflet2 |>
-    addCircleMarkers(data = data_loc,
-                     color = ~pal_clan(clan),
-                     group = lc,
-                     radius = 1,
-                     fillOpacity = 1,
-                     popup = ~paste("Year:", year,"<br>",
-                                    "Clan:", clan, "<br>", 
-                                    "Name:", lndmrk_))
-}
-
-#Add toggle control for years
-location_leaflet2 <- location_leaflet2 |>
-  
-  addLayersControl(
-    baseGroups = loc,
-    overlayGroups = c("Location"),
-    options = layersControlOptions(collapsed = FALSE)
-  ) |>
-  
-  addScaleBar(position = "bottomleft", options = list(metric = TRUE, imperial = FALSE)) |>
-  
-  #Add a legend
-  addLegend("bottomright", pal = pal_clan, values = DB_AllGPS_sf_wgs84$clan,
-            title = "Clan", opacity = 1)
-  
-
-location_leaflet2  # display the map
-
-
-#save
-htmlwidgets::saveWidget(location_leaflet2, file = "Maps/location_leaflet2.html", selfcontained = TRUE)
-
-```
-
-
-
-# 2. Creating the RSF
+# 1. Creating the RSF
 
 ALSO, we need to control for the obs effort (some years field team would go more on obs vs other years/season). I guess with year as a random, and month as a covariable, it does control for this...
-
-
 
 # 3. Covariables
 
@@ -492,24 +170,18 @@ We have a lot of covariables to create. Here is the list:
 
 -   Rank of the females at the den
 
-In more of a post-hoc thing:
--   Number of cubs at dens
-
-
+In more of a post-hoc thing: - Number of cubs at dens
 
 ```{r}
 
 ```
 
-
 ## 3.1. Distance to Talek
 
-The first thing is to tell R to use python to be able to get the 20+ year historical satellite imagery data from Google Earth Engine, since it is the easiest way to get the Talek town borders for all those years. That API (Application Programming Interface) is only available in Python or JavaScript. So I have to tell R to use Python to have access to that.
-  --> An API is like a menu at a restaurant - it lists the things you can ask for (functions, data) and tells the kitchen (the software) how to prepare them for you.
-  --> Google Earth Engine API = the set of commands you can send to Google's satellite image servers to request data (e.g., "give me all Landsat images for Talek Town in 2005").
+The first thing is to tell R to use python to be able to get the 20+ year historical satellite imagery data from Google Earth Engine, since it is the easiest way to get the Talek town borders for all those years. That API (Application Programming Interface) is only available in Python or JavaScript. So I have to tell R to use Python to have access to that. --\> An API is like a menu at a restaurant - it lists the things you can ask for (functions, data) and tells the kitchen (the software) how to prepare them for you. --\> Google Earth Engine API = the set of commands you can send to Google's satellite image servers to request data (e.g., "give me all Landsat images for Talek Town in 2005").
 
+### TALEK
 
-### TALEK 
 ```{r}
 # 1. Location of Talek town, Maasai Mara
 talek_point <- ee$Geometry$Point(35.216423, -1.442912) #talek town center
@@ -517,6 +189,7 @@ talek_roi <- talek_point$buffer(600) # 5 km radius
 ```
 
 Here is a test for year 2020:
+
 ```{r}
 # 2 - Function for built-up detection
 get_yearly_builtup <- function(year) {
@@ -561,9 +234,6 @@ Map$addLayer(talek_roi, list(color = "blue"), "Talek ROI") +
 
 
 ```
-
-
-
 
 ```{r}
 # 2. Function to mask clouds and detect buildings
@@ -616,9 +286,6 @@ builtup_polygons <- do.call(rbind, lapply(years, get_yearly_builtup))
 st_write(builtup_polygons, "talek_builtup_yearly.shp", delete_dsn = TRUE)
 ```
 
-
-
-
 ### Distance to talek calculation
 
 ```{r}
@@ -642,8 +309,6 @@ CD_all_data$dst_tl <- as.numeric(st_distance(CD_all_data_tl, talek_sf_m))
 
 ```
 
-
-
 ## 5.2. Lions
 
 I want to calculate the distance from the den location points to the closest lion sighting.
@@ -653,10 +318,6 @@ I want to calculate the distance from the den location points to the closest lio
 
 
 ```
-
-
-
-
 
 # 6. RSF
 
@@ -669,15 +330,12 @@ CD_RSF_data <- CD_all_data |>
   
 ```
 
-
 ```{r Save}
 
 CD_RSF_data <- sf::st_write(CD_RSF_data, "data_files/CD_RSF_data.shp")
 CD_RSF_data <- st_read("data_files/CD_RSF_data.shp")
 
 ```
-
-
 
 ## 6.1. RSF model
 
@@ -696,6 +354,7 @@ plot(rsf1)
 ```
 
 With brms:
+
 ```{r brms}
 
 
@@ -708,9 +367,8 @@ brm_RSF <- brm(case_ ~ 1 + (1|clan) + (1|year),
 
 ```
 
-
-
 ## 6.2. Distance to Talek model
+
 ```{r brms tlaek model}
 CD_RSF_data_tl <- CD_RSF_data |>
   filter(clan == "talek")
@@ -726,7 +384,6 @@ brm_RSF_tl <- readRDS("brms_models/brm_RSF_tl.rds")
 
 ```
 
-
 ```{r}
 
 summary(brm_RSF_tl)
@@ -734,12 +391,3 @@ plot(conditional_effects(brm_RSF_tl), points = T)
 
 
 ```
-
-
-
-
-
-
-
-
-

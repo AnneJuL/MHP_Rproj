@@ -95,24 +95,9 @@ load_all_tables()
 ```
 
 
-```{r Data}
+```{r Load dataframe}
 
-CD_for_map <- readr::read_csv2("data_files/CD_for_map.csv")
-DB_AllGPS <- readr::read_csv2("data_files/DB_AllGPS.csv")
-
-
-```
-
-```{r}
-# To make the MCP:
-DB_AllGPS_sf <- sf::st_read("data_files/DB_AllGPS_sf.shp")
-DB_AllGPS_sf_wgs84 <- sf::st_read("data_files/DB_AllGPS_sf_wgs84.shp")
-
-
-
-# Communal den GPS points:
-CD_sf <- sf::st_read("data_files/CD_sf.shp")
-CD_sf_wgs84 <- sf::st_read("data_files/CD_sf_wgs84.shp")
+RandomPointsCD_yearly_data <- sf::st_read("data_files/RandomPointsCD_yearly_data.shp")
 
 
 ```
@@ -358,6 +343,50 @@ lions_data_per_clan <- lions_data|>
 flextable(lions_data_per_clan)
 
 ```
+
+
+
+### iv) Lions map
+
+```{r}
+
+str(CD_lions_wgs84)
+
+# Add lion points in red, sized by number of lions
+lion_mapleaflet <- CD_peryear_mapleaflet |>
+  addCircleMarkers(data = CD_lions_wgs84,
+                   color = "red",
+                   group = CD_lions_wgs84$year,
+                   radius = ~num_lin,   
+                   fillOpacity = 0.8,
+                   popup = ~paste("Year:", year, "<br>", 
+                                  "Number of lions:", num_lin, "<br>",
+                                  "Session ID:", session))
+
+CD_leaflet_lion
+
+
+# not sized by number:
+CD_leaflet_lion2 <- CD_leaflet_inter |>
+  addCircleMarkers(data = CD_lions_wgs84,
+                   color = "red",
+                   group = CD_lions_wgs84$year,
+                   fillOpacity = 0.8,
+                   radius = 1,
+                   popup = ~paste("Year:", year, "<br>", 
+                                  "Number of lions:", num_lin, "<br>",
+                                  "Session ID:", session))
+
+CD_leaflet_lion2
+
+#save
+htmlwidgets::saveWidget(CD_leaflet_lion2, file = "Maps/CD_leaflet_lion2.html", selfcontained = TRUE)
+
+
+```
+
+
+
 
 
 
