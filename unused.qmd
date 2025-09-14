@@ -1,7 +1,29 @@
 ---
-title: "trash"
-format: html
+output: html_document
+title: "MHP Special Project - trash/unused"
+author: "Anne Ju Laberge"
+date: "2025"
+format:
+  html:
+    
+    code-fold: true
+    output-fold: true
+    code-tools: true
+    code-link: true
+    code-summary: "Show the code"
+    theme: cosmo
+    embed-resources: true
+    self-contained: true
+    toc-depth: 5
+    toc: true
+    toc-float: true
 editor: visual
+editor_options:
+   
+   chunk_output_type: console
+execute:
+  warning: false
+  error: true
 ---
 
 ### OSM
@@ -915,10 +937,8 @@ CD_clan_KDE_mapdata <- sf::st_write(CD_clan_KDE_mapdata, "data_files/CD_clan_KDE
 
 ```
 
-
-
-
 ## MCP (old way)
+
 ```{r Random_points; old way}
 #serenan 
 presence_track_serenan <- presence_track |> subset(clan == "serenan") 
@@ -944,23 +964,3 @@ rp_clans_MCP <- random_points(mcp95_clan_sf, n=4000, presence = presence_track)
 plot(rp_clans_MCP)
 
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

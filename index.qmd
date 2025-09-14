@@ -1,0 +1,13 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# **Spatiotemporal variation and drivers for denning in spotted hyenas in a changing landscape.** {.unnumbered}
+
+------------------------------------------------------------------------
+
+Resource selection function (RSF) to identify drivers of commmunal den location. 
+Mara Hyena Project
+By Anne Ju Laberge

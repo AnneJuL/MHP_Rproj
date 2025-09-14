@@ -1,32 +1,12 @@
 ---
 output: html_document
-title: "MHP Special Project - Data prep"
-author: "Anne Ju Laberge"
-date: "2025"
-format:
-  html:
-    
-    code-fold: true
-    output-fold: true
-    code-tools: true
-    code-link: true
-    code-summary: "Show the code"
-    theme: cosmo
-    embed-resources: true
-    self-contained: true
-    toc-depth: 5
-    toc: true
-    toc-float: true
-editor: visual
-editor_options:
-   
-   chunk_output_type: console
-execute:
-  warning: false
-  error: true
+editor_options: 
+  chunk_output_type: console
 ---
 
-# 0. Data
+# Data preparation
+
+# 0. Libraries et al.
 
 Installing the package to have access to the MHP data (Just for the first time).
 

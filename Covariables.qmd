@@ -1,32 +1,12 @@
 ---
 output: html_document
-title: "MHP Special Project - RSF"
-author: "Anne Ju Laberge"
-date: "2025"
-format:
-  html:
-    
-    code-fold: true
-    output-fold: true
-    code-tools: true
-    code-link: true
-    code-summary: "Show the code"
-    theme: cosmo
-    embed-resources: true
-    self-contained: true
-    toc-depth: 5
-    toc: true
-    toc-float: true
-editor: visual
-editor_options:
-   
-   chunk_output_type: console
-execute:
-  warning: false
-  error: true
+editor_options: 
+  chunk_output_type: console
 ---
 
-# 0. Data
+# Creating the covariables 
+
+# 0. Libraries et al.
 
 ```{r Packages}
 
@@ -99,7 +79,6 @@ load_all_tables()
 
 RandomPointsCD_yearly_data <- sf::st_read("data_files/RandomPointsCD_yearly_data.shp")
 
-
 ```
 
 
@@ -150,7 +129,6 @@ DF_lions_loc <- merge(DF_lions_sum, DF_lions_loc_data, by = "session")
 
 I also need to join the tblSessions to get the clan territory and date of the specific sessions ID.
 
-
 ```{r Clan and year}
 
 DF_lions_sess_data <- tblSessions |>
@@ -181,7 +159,6 @@ DF_lions_clans <- DF_lions_date |>
 Now we add the GPS points for the utme and utmn columns with NAs based on the landmark ID point.
 
 ```{r Filling NAs}
-
 # first create a dataframe with all the coordinates for the landmarks:
 #that was created on line #331
 
@@ -192,10 +169,14 @@ DF_lions_data <- DF_lions_clans |>
          utmn = ifelse(is.na(utmn), utmn_df2, utmn)) |>
   select(-utme_df2, -utmn_df2)  |>
   drop_na(utmn) # get rid of NAs for utmn column
+```
 
 
+### 1.1.1. Cleaning
+
+```{r Cleaning}
 # now we change those weird coordinates for the landmark coordinates
-DF_lions_data2 <- DF_lions_data |>
+DF_lions_data_clean <- DF_lions_data |>
   left_join(DF_lndmk, by = "landmark_id", suffix = c("", "_df2"), relationship = "many-to-many") |>
   mutate(
     utme = if_else(session == "s13727" | 
@@ -218,12 +199,12 @@ DF_lions_data2 <- DF_lions_data |>
   mutate(landmark_id = replace_na(landmark_id, "random"))
 
   
-str(DF_lions_data2)
+str(DF_lions_data_clean)
 
-DF_lions_data2$utme <- as.numeric(DF_lions_data2$utme)
-DF_lions_data2$utmn <- as.numeric(DF_lions_data2$utmn)
+DF_lions_data_clean$utme <- as.numeric(DF_lions_data_clean$utme)
+DF_lions_data_clean$utmn <- as.numeric(DF_lions_data_clean$utmn)
 
-DF_lions_data2 <- DF_lions_data2 |>
+DF_lions_data_clean <- DF_lions_data_clean |>
   drop_na(utme)
 
 ```
@@ -246,9 +227,9 @@ t62190
 t75009
 t77236
 
-```{r}
+```{r Cleaning}
 
-DF_lions_data2 <- DF_lions_data2 |>
+DF_lions_data_clean <- DF_lions_data_clean |>
   mutate(num_lion = ifelse(session == "s114919", 2, num_lion)) |>
   mutate(num_lion = ifelse(session == "t61954" | 
                              session == "t67315" |
@@ -259,7 +240,7 @@ DF_lions_data2 <- DF_lions_data2 |>
 ```
 
 
-Outliers
+### 1.1.2. Outliers
 Change the first 7 in utmn for a 9:
 "t102747" & "s109502"
 
@@ -279,7 +260,7 @@ wrong coordinate:  (somewhere in tanzania, so probably a number is off)
 s24841
 ```{r}
 
-DF_lions_data2 <- DF_lions_data2 |>
+DF_lions_data_clean <- DF_lions_data_clean |>
   mutate(utmn = ifelse(session == "t102747" | session == "s109502", as.numeric(paste0("9", substring(utmn, 2))),
                   utmn))  |>
   filter(session != "t64548") |>
@@ -289,58 +270,58 @@ DF_lions_data2 <- DF_lions_data2 |>
   filter(session != "t72442") |>
   filter(session != "t98672") |>
   filter(session != "t115432") |>
-  filter(session != "s24841")
+  filter(session != "s24841") |>
+   #removing the "." in the clan names
+  mutate(clan = str_replace_all(clan, "\\.", ""))
+
   
 
 ```
 
 
 
-
+### 1.1.3. Shapefiles
 
 Saving it to shp.
 ```{r}
 
-sf_df_lions <- st_as_sf(DF_lions_data2, coords = c("utme", "utmn"), crs = 32736)
+sf_df_lions <- st_as_sf(DF_lions_data_clean, coords = c("utme", "utmn"), crs = 32736)
 
 #Save the sf dataframe - can only do it once when it is not created before
-CD_sf_lions <- sf::st_write(sf_df_lions, "data_files/CD_sf_lions.shp")
-
-CD_sf_lions <- sf::st_read("data_files/CD_sf_lions.shp")
-
+DB_lions_sf <- sf::st_write(sf_df_lions, "data_files/DB_lions_sf.shp")
 ```
 
 Change to wgs84
 ```{r}
-CD_lions_wgs84 <- st_transform(CD_sf_lions, crs = 4326)
+DB_lions_wgs84 <- st_transform(DB_lions_sf, crs = 4326)
 #4326 is the EPSG code for the WGS84 system, which uses degrees of latitude and longitude.
 
 # save the lat long data points into a shapefile 
-CD_lions_wgs84 <- sf::st_write(CD_lions_wgs84, "data_files/CD_lions_wgs84.shp")
-
-#to read the shape file just created
-CD_lions_wgs84 <- sf::st_read("data_files/CD_lions_wgs84.shp")
-
+DB_lions_wgs84 <- sf::st_write(DB_lions_wgs84, "data_files/DB_lions_wgs84.shp")
 
 ```
 
 
-###data
+### 1.1.4. Summarize
 ```{r}
 
-lions_data <- CD_sf_lions |>
+lions_data <- DB_lions_sf |>
+  st_drop_geometry(lions_data) |>
   group_by(year, clan) |>
-  summarize(n_lion = sum(num_lin))
+  summarize(n_lion = sum(num_lion))
 
-lions_data <- st_drop_geometry(lions_data)
-
+#Save
 write.csv2(lions_data, "data_files/lions_data.csv", row.names = F, quote = F)
 
-lions_data_per_clan <- lions_data|>
+lions_data_per_clan <- lions_data |>
   group_by(clan) |>
   summarize(n_lion = sum(n_lion))
 
 flextable(lions_data_per_clan)
+
+#Save
+write.csv2(lions_data_per_clan, "data_files/lions_data_per_clan.csv", row.names = F, quote = F)
+
 
 ```
 

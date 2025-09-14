@@ -1,32 +1,13 @@
 ---
 output: html_document
-title: "MHP Special Project - RSF"
-author: "Anne Ju Laberge"
-date: "2025"
-format:
-  html:
-    
-    code-fold: true
-    output-fold: true
-    code-tools: true
-    code-link: true
-    code-summary: "Show the code"
-    theme: cosmo
-    embed-resources: true
-    self-contained: true
-    toc-depth: 5
-    toc: true
-    toc-float: true
-editor: visual
-editor_options:
-   
-   chunk_output_type: console
-execute:
-  warning: false
-  error: true
+editor_options: 
+  chunk_output_type: console
 ---
 
-# 0. Data
+
+# Resource Selection Function - Drivers of communal den location
+
+# 0. Libraries et al.
 
 Load packages
 

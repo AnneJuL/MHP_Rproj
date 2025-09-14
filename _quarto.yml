@@ -1,0 +1,32 @@
+project:
+  type: book
+
+book:
+  title: "MHP special project - Den location selection"
+  author: "Anne Ju Laberge"
+  date: "2025"
+  chapters:
+    - index.qmd
+    - CD_data.qmd
+    - Covariables.qmd
+    - CD_RSF.qmd
+
+
+format:
+  html:
+    code-fold: true
+    code-tools: true
+    code-link: true
+    code-summary: "Show the code"
+    theme: cosmo
+    embed-resources: true
+    self-contained: true
+    toc-depth: 5
+    toc: true
+
+editor: visual
+editor_options:
+   chunk_output_type: console
+execute :
+  warning : false
+  error: false
