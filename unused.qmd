@@ -789,13 +789,6 @@ htmlwidgets::saveWidget(rp_KDEs_plot, file = "Maps/rp_KDEs_plot.html", selfconta
 
 ```
 
-
-
-
-
-
-
-
 # 2. KDE by clans
 
 Here we will make KDE, kernel density estimation.
@@ -921,6 +914,38 @@ CD_clan_KDE_mapdata <- sf::st_write(CD_clan_KDE_mapdata, "data_files/CD_clan_KDE
 
 
 ```
+
+
+
+
+## MCP (old way)
+```{r Random_points; old way}
+#serenan 
+presence_track_serenan <- presence_track |> subset(clan == "serenan") 
+
+#serenas 
+presence_track_serenas <- presence_track |> subset(clan == "serenas") 
+
+#hz 
+presence_track_hz <- presence_track |> subset(clan == "happyzebra") 
+
+#talek 
+presence_track_talek <- presence_track |> subset(clan == "talek") 
+
+
+# make MCP valid:
+mcp95_clan_sf <- st_make_valid(mcp95_clan_sf)
+
+
+#creating the dataset to use in RSF after (for all clans) 
+rp_clans_MCP <- random_points(mcp95_clan_sf, n=4000, presence = presence_track) 
+
+#Visualising 
+plot(rp_clans_MCP)
+
+```
+
+
 
 
 
