@@ -99,6 +99,12 @@ library(magick)
 
 library(flextable)
 
+# For RSF
+library(amt) # for the RSF
+library(adehabitatHR) # for mcp
+library(brms)
+library(glmmTMB) # to make RSF models
+
 ```
 
 ```{r Load MHP tables}
@@ -878,25 +884,48 @@ Also, we are using the 95% MCP, so that it removes the 5% of outlier points.
 ### 3.1.1. Individual MCPs
 
 Here is the MCPs for all hyenas locations
-```{r Clan MCPs}
-
+```{r sp}
 # Convert all points to sp (adehabitatHR works with sp)
 CD_sp <- as(DB_AllGPS_sf_wgs84, "Spatial")
+```
 
+
+```{r Clan 95 MCPs}
 # Create MCPs grouped by clan
-mcp_clan <- mcp(CD_sp[, "clan"], percent = 95)
+mcp95_clan <- mcp(CD_sp[, "clan"], percent = 95)
 
 # Convert back to sf
-mcp_clan_sf <- st_as_sf(mcp_clan)
+mcp95_clan_sf <- st_as_sf(mcp95_clan)
 
 # Inspect
-plot(st_geometry(mcp_clan_sf), col = NA, border = "red")
+plot(st_geometry(mcp95_clan_sf), col = NA, border = "red")
 
 # change id for clan 
-mcp_clan_sf <- mcp_clan_sf |>
+mcp95_clan_sf <- mcp95_clan_sf |>
   rename(clan = id)
 
 ```
+
+```{r Clans 100 MCP}
+
+# Create MCPs grouped by clan
+mcp100_clan <- mcp(CD_sp[, "clan"], percent = 100)
+
+# Convert back to sf
+mcp100_clan_sf <- st_as_sf(mcp100_clan)
+
+# Inspect
+plot(st_geometry(mcp100_clan_sf), col = NA, border = "red")
+
+# change id for clan 
+mcp100_clan_sf <- mcp100_clan_sf |>
+  rename(clan = id)
+
+```
+
+
+
+
 
 Save
 ```{r Save}
