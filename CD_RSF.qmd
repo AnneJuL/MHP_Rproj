@@ -127,198 +127,9 @@ CD_lions_wgs84 <- CD_lions_wgs84 |>
 
 ALSO, we need to control for the obs effort (some years field team would go more on obs vs other years/season). I guess with year as a random, and month as a covariable, it does control for this...
 
-# 3. Covariables
-
-Now we need to create covariables.
-
-We have a lot of covariables to create. Here is the list:
-
--   Distance to human community\*
-
--   Distance to last and closest lion sighting\*
-
--   Distance/number (don't think we have that) of cattle\*
-
--   Land cover (bush vs plains, etc.)\*
-
--   Altitude\*
-
--   Distance to edge of territory\*
-
--   Distance to water\*
-
--   Amount of time (maybe in number of days?) that the den was used (in interaction with distance to humans?
-
--   Rank of the females at the den
-
-In more of a post-hoc thing: - Number of cubs at dens
-
-```{r}
-
-```
-
-## 3.1. Distance to Talek
-
-The first thing is to tell R to use python to be able to get the 20+ year historical satellite imagery data from Google Earth Engine, since it is the easiest way to get the Talek town borders for all those years. That API (Application Programming Interface) is only available in Python or JavaScript. So I have to tell R to use Python to have access to that. --\> An API is like a menu at a restaurant - it lists the things you can ask for (functions, data) and tells the kitchen (the software) how to prepare them for you. --\> Google Earth Engine API = the set of commands you can send to Google's satellite image servers to request data (e.g., "give me all Landsat images for Talek Town in 2005").
-
-### TALEK
-
-```{r}
-# 1. Location of Talek town, Maasai Mara
-talek_point <- ee$Geometry$Point(35.216423, -1.442912) #talek town center
-talek_roi <- talek_point$buffer(600) # 5 km radius
-```
-
-Here is a test for year 2020:
-
-```{r}
-# 2 - Function for built-up detection
-get_yearly_builtup <- function(year) {
-  s2 <- ee$ImageCollection("COPERNICUS/S2_SR")$
-    filterBounds(talek_roi)$
-    filterDate(sprintf("%d-01-01", year), sprintf("%d-12-31", year))$
-    filter(ee$Filter$lt("CLOUDY_PIXEL_PERCENTAGE", 20))$
-    median()
-  
-  # Calculate NDBI (built-up) and NDVI (vegetation)
-  ndbi <- s2$normalizedDifference(c("B11", "B8"))
-  ndvi <- s2$normalizedDifference(c("B8", "B4"))
-  
-  # Threshold: built-up AND low vegetation
-  builtup_mask <- ndbi$gt(0.2)$And(ndvi$lt(0.3))
-  
-  # Mask original image
-  builtup <- builtup_mask$selfMask()
-  
-  # Reduce to vectors inside ROI
-  vectors <- builtup$reduceToVectors(
-    geometry = talek_roi,
-    geometryType = "polygon",
-    reducer = ee$Reducer$countEvery(),
-    scale = 10,
-    maxPixels = 1e10
-  )
-  
-  vectors$set("year", year)
-}
-
-# --- Year of interest ---
-year <- 2020
-
-# --- Generate polygons for that year ---
-builtup_polygons <- get_yearly_builtup(year)
-
-# --- Visualization parameters ---
-Map$centerObject(talek_roi, zoom = 15)
-Map$addLayer(talek_roi, list(color = "blue"), "Talek ROI") +
-  Map$addLayer(builtup_polygons, list(color = "red"), paste("Built-up", year))
 
 
-```
-
-```{r}
-# 2. Function to mask clouds and detect buildings
-mask_builtup <- function(image) {
-  # Calculate NDBI
-  swir <- image$select("B11")
-  nir <- image$select("B8")
-  ndbi <- swir$subtract(nir)$divide(swir$add(nir))
-  
-  # Built-up mask (adjust threshold if needed)
-  builtup_mask <- ndbi$gt(0.2) # try lowering to 0.1 if empty
-  
-  # Apply mask but keep it as a single-band image for vectorizing
-  return(builtup_mask$rename("builtup"))
-}
-
-# 3. Function to get yearly composite and vector polygons
-get_yearly_builtup <- function(year) {
-  start <- sprintf("%d-01-01", year)
-  end <- sprintf("%d-12-31", year)
-  
-  yearly_img <- ee$ImageCollection("COPERNICUS/S2_SR")$
-    filterBounds(region)$
-    filterDate(start, end)$
-    map(mask_builtup)$
-    max() # union of all built-up pixels in the year
-  
-  # Ensure projection
-  yearly_img <- yearly_img$setDefaultProjection("EPSG:4326", NULL, 10)
-  
-  # Vectorize built-up areas
-  vectors <- yearly_img$reduceToVectors(
-    geometry = region,
-    geometryType = "polygon",
-    scale = 10,
-    crs = "EPSG:4326",
-    maxPixels = 1e10
-  )
-  
-  vectors_sf <- ee_as_sf(vectors)
-  vectors_sf$year <- year
-  return(vectors_sf)
-}
-
-# 4. Run for a range of years
-years <- 2021:2023
-builtup_polygons <- do.call(rbind, lapply(years, get_yearly_builtup))
-
-# 5. Save shapefile
-st_write(builtup_polygons, "talek_builtup_yearly.shp", delete_dsn = TRUE)
-```
-
-### Distance to talek calculation
-
-```{r}
-
-talek_center <- data.frame(
-  lon = 35.216423,
-  lat = -1.442912
-)
-
-#Convert to sf object
-talek_sf <- st_as_sf(talek_center, coords = c("lon", "lat"), crs = 4326)
-
-# Transform to a projected CRS in meters (UTM zone for this area: 36S)
-CD_all_data_tl <- st_transform(CD_all_data, 32736)    # EPSG 32736 = WGS 84 / UTM zone 36S
-talek_sf_m <- st_transform(talek_sf, 32736)
-
-
-# Calculate distances in meters
-CD_all_data$dst_tl <- as.numeric(st_distance(CD_all_data_tl, talek_sf_m))
-
-
-```
-
-## 5.2. Lions
-
-I want to calculate the distance from the den location points to the closest lion sighting.
-
-```{r}
-
-
-
-```
-
-# 6. RSF
-
-Now, we can use `CD_all_data` in the RSF.
-
-```{r RSF data}
-
-CD_RSF_data <- CD_all_data |>
-  rename(case = case_)
-  
-```
-
-```{r Save}
-
-CD_RSF_data <- sf::st_write(CD_RSF_data, "data_files/CD_RSF_data.shp")
-CD_RSF_data <- st_read("data_files/CD_RSF_data.shp")
-
-```
-
-## 6.1. RSF model
+## 1.1. RSF model
 
 I will separate the Talek points with the triangle ones, so that I can make a model with the Talek town borders as a variable.
 
@@ -348,7 +159,7 @@ brm_RSF <- brm(case_ ~ 1 + (1|clan) + (1|year),
 
 ```
 
-## 6.2. Distance to Talek model
+## 1.2. Distance to Talek model
 
 ```{r brms tlaek model}
 CD_RSF_data_tl <- CD_RSF_data |>
@@ -372,3 +183,11 @@ plot(conditional_effects(brm_RSF_tl), points = T)
 
 
 ```
+
+
+
+# 2. Lion RSF
+
+
+
+

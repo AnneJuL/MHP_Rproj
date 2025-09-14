@@ -81,8 +81,306 @@ RandomPointsCD_yearly_data <- sf::st_read("data_files/RandomPointsCD_yearly_data
 
 ```
 
+# 1. Installing rgee
 
-# 1. Covariables 
+Setting up a google earth engine project first.
+
+The first time I need to install conda, create the rgee environment within the conda thing. 
+
+I followed the steps here to have it finally worked: https://gis.stackexchange.com/questions/473730/authentification-error-when-installing-rgee-in-rstudio?newreg=3674f3f594ee4f91856aa2e5df5b204d
+
+Here are the lines that needed to be run the first time, but now I don't need them anymore, just the ones in the code box.
+
+- install_packages("rgee")
+- reticulate::conda_install(envname = "rgee", packages = "earthengine-api=0.1.370", channel = "conda-forge", python_version = "3.9")
+
+```{r}
+#to get rgeeExtra, to use things like the gif animation
+#remotes::install_github("r-earthengine/rgeeExtra")
+
+```
+
+
+```{r}
+library(reticulate)
+
+#This is to tell R to use the right Python environment
+reticulate::use_condaenv("rgee", required = TRUE)
+
+library(rgee)
+library(rgeeExtra)
+
+#Initialize EE 
+ee_Initialize()
+#important to initialize earth engine without the user and project argument here:
+
+```
+
+## 1.1. Checking 
+The ee_check() function will help you for checking the sanity of your rgee installation and dependencies.
+
+- ee_check_python() - Python version
+- ee_check_credentials() - Google Drive and GCS credentials
+- ee_check_python_packages() - Python packages
+
+```{r}
+ee_check()
+
+ee_check_python()
+ee_check_credentials()
+ee_check_python_packages()
+```
+
+
+
+## 1.2. Tests
+```{r}
+
+# test to make sure all is running smoothly:
+ee$Image("CGIAR/SRTM90_V4")$getInfo()
+ee$String('Hello from the Earth Engine servers!')$getInfo()
+
+```
+
+
+### i) Night time lights
+From : https://github.com/r-spatial/rgee
+To Compute the trend of night-time lights
+
+Let's create a new band containing the image date as years since 1991 by extracting the year of the image acquisition date and subtracting it from 1991.
+```{r}
+
+createTimeBand <-function(img) {
+  year <- ee$Date(img$get('system:time_start'))$get('year')$subtract(1991L) 
+  ee$Image(year)$byte()$addBands(img)
+}
+
+#Use your TimeBand function to map it over the night-time lights collection.
+
+collection <- ee$
+  ImageCollection('NOAA/DMSP-OLS/NIGHTTIME_LIGHTS')$
+  select('stable_lights')$
+  map(createTimeBand)
+
+# Compute a linear fit over the series of values at each pixel, so that you can visualize the y-intercept as green, and the positive/negative slopes as red/blue.
+col_reduce <- collection$reduce(ee$Reducer$linearFit())
+col_reduce <- col_reduce$addBands(
+  col_reduce$select('scale'))
+ee_print(col_reduce)
+
+# to visualize the map: 
+Map$setCenter(9.08203, 47.39835, 3)
+Map$addLayer(
+  eeObject = col_reduce,
+  visParams = list(
+    bands = c("scale", "offset", "scale"),
+    min = 0,
+    max = c(0.18, 20, -0.18)
+  ),
+  name = "stable lights trend"
+)
+
+```
+
+
+### ii) Worldwide elevation map
+From: https://cran.r-project.org/web/packages/rgee/vignettes/rgee01.html
+
+SRTM (Shuttle Radar Topography Mission) elevation values worldwide:
+```{r}
+
+#create a ee object
+srtm <- ee$Image("USGS/SRTMGL1_003")
+
+#Define visualization parameters
+viz <- list(
+  max = 4000,
+  min = 0,
+  palette = c("#000000","#5AAD5A","#A9AD84","#FFFFFF"))
+
+# using Map$addLayer to visualize the map interactively
+Map$addLayer(
+  eeObject = srtm,
+  visParams =  viz,
+  name = 'SRTM')
+
+```
+
+
+### iii) Precipitation
+From: https://github.com/r-spatial/rgee
+
+To play with some precipitation data: 
+
+nc = North Carolina counties, 100 simple features with 14 attributes
+```{r}
+# to read the nc shapefile:
+nc <- st_read(system.file("shape/nc.shp", package = "sf"), quiet = TRUE)
+
+plot(nc)
+
+# will use the Terraclimate database
+terraclimate <- ee$ImageCollection("IDAHO_EPSCOR/TERRACLIMATE") %>%
+  ee$ImageCollection$filterDate("2001-01-01", "2002-01-01") %>%
+  ee$ImageCollection$map(function(x) x$select("pr")) %>% # Select only precipitation bands
+  ee$ImageCollection$toBands() %>% # from imagecollection to image
+  ee$Image$rename(sprintf("PP_%02d",1:12)) # rename the bands of an image
+
+# to extract monthly precipitation:
+ee_nc_rain <- ee_extract(x = terraclimate, y = nc["NAME"], sf = FALSE)
+
+```
+
+ee_extract will help you to extract monthly precipitation values from the Terraclimate ImageCollection. ee_extract works similar to raster::extract, you just need to define: the ImageCollection object (x), the geometry (y), and a function to summarize the values (fun).
+
+```{r}
+# then we visualize it using ggplot:
+ee_nc_rain %>%
+  pivot_longer(-NAME, names_to = "month", values_to = "pr") %>%
+  mutate(month, month=gsub("PP_", "", month)) %>%
+  ggplot(aes(x = month, y = pr, group = NAME, color = pr)) +
+  geom_line(alpha = 0.4) +
+  xlab("Month") +
+  ylab("Precipitation (mm)") +
+  theme_minimal()
+```
+
+### iv) NDVI animation
+
+From: https://github.com/r-spatial/rgee
+
+To create a NDVI animation map (Peru's Arequepia region)
+ 
+```{r}
+
+#Define the regional bounds of animation frames and a mask to clip the NDVI data by.
+mask <- system.file("shp/arequipa.shp", package = "rgee") %>%
+  st_read(quiet = TRUE) %>%
+  sf_as_ee()
+region <- mask$geometry()$bounds()
+
+
+#Retrieve the MODIS Terra Vegetation Indices 16-Day Global 1km dataset as an ee.ImageCollection and then, select the NDVI band.
+
+col <- ee$ImageCollection('MODIS/006/MOD13A2')$select('NDVI')
+
+#Group images by composite date
+col <- col$map(function(img) {
+  doy <- ee$Date(img$get('system:time_start'))$getRelative('day', 'year')
+  img$set('doy', doy)
+})
+distinctDOY <- col$filterDate('2013-01-01', '2014-01-01')
+
+```
+
+Now, let's define a filter that identifies which images from the complete collection match the DOY from the distinct DOY collection.
+```{r}
+filter <- ee$Filter$equals(leftField = 'doy', rightField = 'doy')
+
+```
+Define a join and convert the resulting FeatureCollection to an ImageCollection... it will take you only 2 lines of code!
+
+```{r}
+join <- ee$Join$saveAll('doy_matches')
+joinCol <- ee$ImageCollection(join$apply(distinctDOY, col, filter))
+```
+
+Apply median reduction among the matching DOY collections.
+
+```{r}
+comp <- joinCol$map(function(img) {
+  doyCol = ee$ImageCollection$fromImages(
+    img$get('doy_matches')
+  )
+  doyCol$reduce(ee$Reducer$median())
+})
+
+#define RGB visualization parameters first.
+visParams = list(
+  min = 0.0,
+  max = 9000.0,
+  bands = "NDVI_median",
+  palette = c(
+    'FFFFFF', 'CE7E45', 'DF923D', 'F1B555', 'FCD163', '99B718', '74A901',
+    '66A000', '529400', '3E8601', '207401', '056201', '004C00', '023B01',
+    '012E01', '011D01', '011301'
+  )
+)
+
+#Create RGB visualization images for use as animation frames.
+rgbVis <- comp$map(function(img) {
+  do.call(img$visualize, visParams) %>%
+    ee$Image$clip(mask)
+})
+
+
+#GIF visualization parameters.
+gifParams <- list(
+  region = region,
+  dimensions = 600,
+  crs = 'EPSG:3857',
+  framesPerSecond = 10
+)
+
+# get month names: 
+dates_modis_mabbr <- distinctDOY %>%
+  ee_get_date_ic %>% # Get Image Collection dates
+  '[['("time_start") %>% # Select time_start column
+  lubridate::month() %>% # Get the month component of the datetime
+  '['(month.abb, .) # subset around month abbreviations
+```
+
+Finally, we use ee_utils_gif_* functions to render the GIF animation and add some texts.
+```{r}
+
+animation <- ee_utils_gif_creator(rgbVis, gifParams, mode = "wb")
+animation %>%
+  ee_utils_gif_annotate(
+    text = "NDVI: MODIS/006/MOD13A2",
+    size = 15, color = "white",
+    location = "+10+10"
+  ) %>%
+  ee_utils_gif_annotate(
+    text = dates_modis_mabbr,
+    size = 30,
+    location = "+290+350",
+    color = "white",
+    font = "arial",
+    boxcolor = "#000000"
+  ) # -> animation_wtxt
+
+#to save it
+# ee_utils_gif_save(animation_wtxt, path = "raster_as_ee.gif")
+
+```
+
+
+# 2. Covariables 
+
+Now we need to create covariables to put in the RSF models. Those will be our potential drivers for communal den locations.
+
+We have a lot of covariables to create. Here is the list:
+
+-   Distance to last and closest lion sighting\*
+
+-   Distance to human community (Talek) \*
+
+-   Distance/number (don't think we have that) of cattle\*
+
+-   Land cover (bush vs plains, etc.)\*
+
+-   Altitude\*
+
+-   Distance to edge of territory\*
+
+-   Distance to water\*
+
+- Time of year ? --> I really want to find a way to get this and have a 
+
+
+In more of a post-hoc thing: - Number of cubs at dens
+
+
 
 ## 1.1. Lions
 
@@ -326,16 +624,14 @@ write.csv2(lions_data_per_clan, "data_files/lions_data_per_clan.csv", row.names 
 ```
 
 
-
 ### 1.1.5. Map
-
 ```{r}
 
 # Reload our base map CD_peryear_mapleaflet
 CD_peryear_mapleaflet <- readRDS("Maps/CD_peryear_mapleaflet.rds")
 
 
-lion_mapleaflet <- CD_peryear_mapleaflet |>
+CD_lion_mapleaflet <- CD_peryear_mapleaflet |>
   addCircleMarkers(data = DB_lions_wgs84,
                    color = "red",
                    group = DB_lions_wgs84$year,
@@ -345,10 +641,20 @@ lion_mapleaflet <- CD_peryear_mapleaflet |>
                                   "Number of lions:", num_lion, "<br>",
                                   "Session ID:", session))
 
-lion_mapleaflet
+CD_lion_mapleaflet
 
 #save
-htmlwidgets::saveWidget(lion_mapleaflet, file = "Maps/lion_mapleaflet.html", selfcontained = TRUE)
+htmlwidgets::saveWidget(CD_lion_mapleaflet, file = "Maps/CD_lion_mapleaflet.html", selfcontained = TRUE)
+
+
+```
+
+### 1.1.6. Calculation of distance
+
+I want to calculate the distance from the den location points to the closest lion sighting.
+
+```{r}
+
 
 
 ```
@@ -358,286 +664,168 @@ htmlwidgets::saveWidget(lion_mapleaflet, file = "Maps/lion_mapleaflet.html", sel
 
 
 
-## 1.2. rgee
 
-Setting up a google earth engine project first.
 
-The first time I need to install conda, create the rgee environment within the conda thing. 
 
-I followed the steps here to have it finally worked: https://gis.stackexchange.com/questions/473730/authentification-error-when-installing-rgee-in-rstudio?newreg=3674f3f594ee4f91856aa2e5df5b204d
 
-Here are the lines that needed to be run the first time, but now I don't need them anymore, just the ones in the code box.
 
-- install_packages("rgee")
-- reticulate::conda_install(envname = "rgee", packages = "earthengine-api=0.1.370", channel = "conda-forge", python_version = "3.9")
+
+
+
+
+
+## 1.2. Distance to Talek
+
+The first thing is to tell R to use python to be able to get the 20+ year historical satellite imagery data from Google Earth Engine, since it is the easiest way to get the Talek town borders for all those years. That API (Application Programming Interface) is only available in Python or JavaScript. So I have to tell R to use Python to have access to that. --\> An API is like a menu at a restaurant - it lists the things you can ask for (functions, data) and tells the kitchen (the software) how to prepare them for you. --\> Google Earth Engine API = the set of commands you can send to Google's satellite image servers to request data (e.g., "give me all Landsat images for Talek Town in 2005").
 
 ```{r}
-#to get rgeeExtra, to use things like the gif animation
-#remotes::install_github("r-earthengine/rgeeExtra")
-
+# 1. Location of Talek town, Maasai Mara
+talek_point <- ee$Geometry$Point(35.216423, -1.442912) #talek town center
+talek_roi <- talek_point$buffer(600) # 5 km radius
 ```
 
+Here is a test for year 2020:
 
 ```{r}
-library(reticulate)
-
-#This is to tell R to use the right Python environment
-reticulate::use_condaenv("rgee", required = TRUE)
-
-library(rgee)
-library(rgeeExtra)
-
-#Initialize EE 
-ee_Initialize()
-#important to initialize earth engine without the user and project argument here:
-
-```
-
-### Checking 
-The ee_check() function will help you for checking the sanity of your rgee installation and dependencies.
-
-- ee_check_python() - Python version
-- ee_check_credentials() - Google Drive and GCS credentials
-- ee_check_python_packages() - Python packages
-
-```{r}
-ee_check()
-
-ee_check_python()
-ee_check_credentials()
-ee_check_python_packages()
-```
-
-
-
-### Tests
-```{r}
-
-# test to make sure all is running smoothly:
-ee$Image("CGIAR/SRTM90_V4")$getInfo()
-ee$String('Hello from the Earth Engine servers!')$getInfo()
-
-```
-
-
-#### Night time lights
-From : https://github.com/r-spatial/rgee
-To Compute the trend of night-time lights
-
-Let's create a new band containing the image date as years since 1991 by extracting the year of the image acquisition date and subtracting it from 1991.
-```{r}
-
-createTimeBand <-function(img) {
-  year <- ee$Date(img$get('system:time_start'))$get('year')$subtract(1991L) 
-  ee$Image(year)$byte()$addBands(img)
+# 2 - Function for built-up detection
+get_yearly_builtup <- function(year) {
+  s2 <- ee$ImageCollection("COPERNICUS/S2_SR")$
+    filterBounds(talek_roi)$
+    filterDate(sprintf("%d-01-01", year), sprintf("%d-12-31", year))$
+    filter(ee$Filter$lt("CLOUDY_PIXEL_PERCENTAGE", 20))$
+    median()
+  
+  # Calculate NDBI (built-up) and NDVI (vegetation)
+  ndbi <- s2$normalizedDifference(c("B11", "B8"))
+  ndvi <- s2$normalizedDifference(c("B8", "B4"))
+  
+  # Threshold: built-up AND low vegetation
+  builtup_mask <- ndbi$gt(0.2)$And(ndvi$lt(0.3))
+  
+  # Mask original image
+  builtup <- builtup_mask$selfMask()
+  
+  # Reduce to vectors inside ROI
+  vectors <- builtup$reduceToVectors(
+    geometry = talek_roi,
+    geometryType = "polygon",
+    reducer = ee$Reducer$countEvery(),
+    scale = 10,
+    maxPixels = 1e10
+  )
+  
+  vectors$set("year", year)
 }
 
-#Use your TimeBand function to map it over the night-time lights collection.
+# --- Year of interest ---
+year <- 2020
 
-collection <- ee$
-  ImageCollection('NOAA/DMSP-OLS/NIGHTTIME_LIGHTS')$
-  select('stable_lights')$
-  map(createTimeBand)
+# --- Generate polygons for that year ---
+builtup_polygons <- get_yearly_builtup(year)
 
-# Compute a linear fit over the series of values at each pixel, so that you can visualize the y-intercept as green, and the positive/negative slopes as red/blue.
-col_reduce <- collection$reduce(ee$Reducer$linearFit())
-col_reduce <- col_reduce$addBands(
-  col_reduce$select('scale'))
-ee_print(col_reduce)
+# --- Visualization parameters ---
+Map$centerObject(talek_roi, zoom = 15)
+Map$addLayer(talek_roi, list(color = "blue"), "Talek ROI") +
+  Map$addLayer(builtup_polygons, list(color = "red"), paste("Built-up", year))
 
-# to visualize the map: 
-Map$setCenter(9.08203, 47.39835, 3)
-Map$addLayer(
-  eeObject = col_reduce,
-  visParams = list(
-    bands = c("scale", "offset", "scale"),
-    min = 0,
-    max = c(0.18, 20, -0.18)
-  ),
-  name = "stable lights trend"
-)
 
 ```
 
-
-#### Worldwide elevation map
-From: https://cran.r-project.org/web/packages/rgee/vignettes/rgee01.html
-
-SRTM (Shuttle Radar Topography Mission) elevation values worldwide:
 ```{r}
+# 2. Function to mask clouds and detect buildings
+mask_builtup <- function(image) {
+  # Calculate NDBI
+  swir <- image$select("B11")
+  nir <- image$select("B8")
+  ndbi <- swir$subtract(nir)$divide(swir$add(nir))
+  
+  # Built-up mask (adjust threshold if needed)
+  builtup_mask <- ndbi$gt(0.2) # try lowering to 0.1 if empty
+  
+  # Apply mask but keep it as a single-band image for vectorizing
+  return(builtup_mask$rename("builtup"))
+}
 
-#create a ee object
-srtm <- ee$Image("USGS/SRTMGL1_003")
-
-#Define visualization parameters
-viz <- list(
-  max = 4000,
-  min = 0,
-  palette = c("#000000","#5AAD5A","#A9AD84","#FFFFFF"))
-
-# using Map$addLayer to visualize the map interactively
-Map$addLayer(
-  eeObject = srtm,
-  visParams =  viz,
-  name = 'SRTM')
-
-```
-
-
-#### Precipitation
-From: https://github.com/r-spatial/rgee
-
-To play with some precipitation data: 
-
-nc = North Carolina counties, 100 simple features with 14 attributes
-```{r}
-# to read the nc shapefile:
-nc <- st_read(system.file("shape/nc.shp", package = "sf"), quiet = TRUE)
-
-plot(nc)
-
-# will use the Terraclimate database
-terraclimate <- ee$ImageCollection("IDAHO_EPSCOR/TERRACLIMATE") %>%
-  ee$ImageCollection$filterDate("2001-01-01", "2002-01-01") %>%
-  ee$ImageCollection$map(function(x) x$select("pr")) %>% # Select only precipitation bands
-  ee$ImageCollection$toBands() %>% # from imagecollection to image
-  ee$Image$rename(sprintf("PP_%02d",1:12)) # rename the bands of an image
-
-# to extract monthly precipitation:
-ee_nc_rain <- ee_extract(x = terraclimate, y = nc["NAME"], sf = FALSE)
-
-```
-
-ee_extract will help you to extract monthly precipitation values from the Terraclimate ImageCollection. ee_extract works similar to raster::extract, you just need to define: the ImageCollection object (x), the geometry (y), and a function to summarize the values (fun).
-
-```{r}
-# then we visualize it using ggplot:
-ee_nc_rain %>%
-  pivot_longer(-NAME, names_to = "month", values_to = "pr") %>%
-  mutate(month, month=gsub("PP_", "", month)) %>%
-  ggplot(aes(x = month, y = pr, group = NAME, color = pr)) +
-  geom_line(alpha = 0.4) +
-  xlab("Month") +
-  ylab("Precipitation (mm)") +
-  theme_minimal()
-```
-
-#### NDVI animation
-
-From: https://github.com/r-spatial/rgee
-
-To create a NDVI animation map (Peru's Arequepia region)
- 
-```{r}
-
-#Define the regional bounds of animation frames and a mask to clip the NDVI data by.
-mask <- system.file("shp/arequipa.shp", package = "rgee") %>%
-  st_read(quiet = TRUE) %>%
-  sf_as_ee()
-region <- mask$geometry()$bounds()
-
-
-#Retrieve the MODIS Terra Vegetation Indices 16-Day Global 1km dataset as an ee.ImageCollection and then, select the NDVI band.
-
-col <- ee$ImageCollection('MODIS/006/MOD13A2')$select('NDVI')
-
-#Group images by composite date
-col <- col$map(function(img) {
-  doy <- ee$Date(img$get('system:time_start'))$getRelative('day', 'year')
-  img$set('doy', doy)
-})
-distinctDOY <- col$filterDate('2013-01-01', '2014-01-01')
-
-```
-
-Now, let's define a filter that identifies which images from the complete collection match the DOY from the distinct DOY collection.
-```{r}
-filter <- ee$Filter$equals(leftField = 'doy', rightField = 'doy')
-
-```
-Define a join and convert the resulting FeatureCollection to an ImageCollection... it will take you only 2 lines of code!
-
-```{r}
-join <- ee$Join$saveAll('doy_matches')
-joinCol <- ee$ImageCollection(join$apply(distinctDOY, col, filter))
-```
-
-Apply median reduction among the matching DOY collections.
-
-```{r}
-comp <- joinCol$map(function(img) {
-  doyCol = ee$ImageCollection$fromImages(
-    img$get('doy_matches')
+# 3. Function to get yearly composite and vector polygons
+get_yearly_builtup <- function(year) {
+  start <- sprintf("%d-01-01", year)
+  end <- sprintf("%d-12-31", year)
+  
+  yearly_img <- ee$ImageCollection("COPERNICUS/S2_SR")$
+    filterBounds(region)$
+    filterDate(start, end)$
+    map(mask_builtup)$
+    max() # union of all built-up pixels in the year
+  
+  # Ensure projection
+  yearly_img <- yearly_img$setDefaultProjection("EPSG:4326", NULL, 10)
+  
+  # Vectorize built-up areas
+  vectors <- yearly_img$reduceToVectors(
+    geometry = region,
+    geometryType = "polygon",
+    scale = 10,
+    crs = "EPSG:4326",
+    maxPixels = 1e10
   )
-  doyCol$reduce(ee$Reducer$median())
-})
+  
+  vectors_sf <- ee_as_sf(vectors)
+  vectors_sf$year <- year
+  return(vectors_sf)
+}
 
-#define RGB visualization parameters first.
-visParams = list(
-  min = 0.0,
-  max = 9000.0,
-  bands = "NDVI_median",
-  palette = c(
-    'FFFFFF', 'CE7E45', 'DF923D', 'F1B555', 'FCD163', '99B718', '74A901',
-    '66A000', '529400', '3E8601', '207401', '056201', '004C00', '023B01',
-    '012E01', '011D01', '011301'
-  )
-)
+# 4. Run for a range of years
+years <- 2021:2023
+builtup_polygons <- do.call(rbind, lapply(years, get_yearly_builtup))
 
-#Create RGB visualization images for use as animation frames.
-rgbVis <- comp$map(function(img) {
-  do.call(img$visualize, visParams) %>%
-    ee$Image$clip(mask)
-})
-
-
-#GIF visualization parameters.
-gifParams <- list(
-  region = region,
-  dimensions = 600,
-  crs = 'EPSG:3857',
-  framesPerSecond = 10
-)
-
-# get month names: 
-dates_modis_mabbr <- distinctDOY %>%
-  ee_get_date_ic %>% # Get Image Collection dates
-  '[['("time_start") %>% # Select time_start column
-  lubridate::month() %>% # Get the month component of the datetime
-  '['(month.abb, .) # subset around month abbreviations
+# 5. Save shapefile
+st_write(builtup_polygons, "talek_builtup_yearly.shp", delete_dsn = TRUE)
 ```
 
-Finally, we use ee_utils_gif_* functions to render the GIF animation and add some texts.
+### 1.2.1. Calculation
+
 ```{r}
 
-animation <- ee_utils_gif_creator(rgbVis, gifParams, mode = "wb")
-animation %>%
-  ee_utils_gif_annotate(
-    text = "NDVI: MODIS/006/MOD13A2",
-    size = 15, color = "white",
-    location = "+10+10"
-  ) %>%
-  ee_utils_gif_annotate(
-    text = dates_modis_mabbr,
-    size = 30,
-    location = "+290+350",
-    color = "white",
-    font = "arial",
-    boxcolor = "#000000"
-  ) # -> animation_wtxt
+talek_center <- data.frame(
+  lon = 35.216423,
+  lat = -1.442912
+)
 
-#to save it
-# ee_utils_gif_save(animation_wtxt, path = "raster_as_ee.gif")
+#Convert to sf object
+talek_sf <- st_as_sf(talek_center, coords = c("lon", "lat"), crs = 4326)
+
+# Transform to a projected CRS in meters (UTM zone for this area: 36S)
+RandomPointsCD_yearly_data_talek <- st_transform(RandomPointsCD_yearly_data, 32736)    # EPSG 32736 = WGS 84 / UTM zone 36S
+talek_sf_m <- st_transform(talek_sf, 32736)
+
+
+# Calculate distances in meters
+RandomPointsCD_yearly_data$dst_tl <- as.numeric(st_distance(RandomPointsCD_yearly_data_talek, talek_sf_m))
+
 
 ```
+
+
 
 
 
 ## 1.3. Land cover
 
+Now we want to get the land cover for the Masaai Mara. With this we will be able to get those covariables:
+
+-   Land cover (bush vs plains, etc.)\*
+
+-   Altitude\*
+
+-   Distance to edge of territory\*
+
+-   Distance to water\*
 
 
 
+```{r}
+
+```
 
 
 
