@@ -210,7 +210,9 @@ CD_for_map <- CD_data_full |>
   
   #Getting rid of NAs
   drop_na(utme, utmn) |>
-  filter(utme != 0)
+  filter(utme != 0) |>
+  #removing the "." in the clan names
+  mutate(clan = str_replace_all(clan, "\\.", ""))
 
 CD_for_map$year <- as.character(CD_for_map$year)
 
@@ -306,6 +308,7 @@ DB_hyenas_clan <- DB_hyenas |>
   filter(clan == "talek" | clan == "talek.w" | clan == "serena.n" | clan == "serena.s" | clan == "happy.zebra") |>
   #changing talek.w into talek
   mutate(clan = str_replace_all(clan, "talek.w", "talek")) |>
+  #removing the "." in the clan names
   mutate(clan = str_replace_all(clan, "\\.", "")) |>
   group_by(session, clan, year) |>
   summarise(
@@ -728,14 +731,16 @@ The points that looks like outliers:
 - s117340 
 
 
-We remove those outliers points
-```{r}
+We remove those outliers points:
+```{r Outliers}
 
+#in sf objects
 DB_AllGPS_sf_clean <- DB_locations_for_MCPs_sf |>
   select(-hyenas) |>
   filter(!session %in% c("t120888", "s58", "t55969", "t112359", "s6974", "s115706", "s117340")) 
 
 
+# normal dataframe
 DB_AllGPS <- DB_locations_for_MCPs_clean |>
   select(-hyenas) |>
   filter(!session %in% c("t120888", "s58", "t55969", "t112359", "s6974", "s115706", "s117340"))
@@ -770,6 +775,11 @@ write_csv2(DB_AllGPS, "data_files/DB_AllGPS.csv")
 This is the locations of all the hyenas seen in the 4 territories:
 ```{r All GPS}
 
+# outlier:
+DB_AllGPS_sf_clean <- DB_AllGPS_sf_clean |>
+  filter(landmark_id != "Migration_Den")
+
+# Saving it:
 DB_AllGPS_sf <- sf::st_write(DB_AllGPS_sf_clean, "data_files/DB_AllGPS_sf.shp")
 
 ```
@@ -784,11 +794,14 @@ THis is with only the den locations:
 # Turning the points into coordinates to put in a map
 
 #Convert the dataframe into a sf object:
-sf_df <- st_as_sf(CD_for_map, coords = c("utme", "utmn"), crs = 32736) #EPSG code is 32736, UTM Zone 36 South
+CD_sf <- st_as_sf(CD_for_map, coords = c("utme", "utmn"), crs = 32736) #EPSG code is 32736, UTM Zone 36 South
 
+#outlier
+CD_sf <- CD_sf |>
+  filter(landmark_id != "Migration_Den")
 
 #Save the sf dataframe - can only do it once when it is not created before
-CD_sf <- sf::st_write(sf_df, "data_files/CD_sf.shp")
+CD_sf <- sf::st_write(CD_sf, "data_files/CD_sf.shp")
 
 ```
 
@@ -819,6 +832,11 @@ Also, to use leaflet (to make maps), we need to change the UTM coordinates into 
 # transform in WGS84
 DB_AllGPS_sf_wgs84 <- st_transform(DB_AllGPS_sf, crs = 4326)
 
+# outlier:
+DB_AllGPS_sf_wgs84 <- DB_AllGPS_sf_wgs84 |>
+  filter(landmark_id != "Migration_Den")
+
+# saving it:
 DB_AllGPS_sf_wgs84 <- sf::st_write(DB_AllGPS_sf_wgs84, "data_files/DB_AllGPS_sf_wgs84.shp")
 
 ```
@@ -827,8 +845,12 @@ DB_AllGPS_sf_wgs84 <- sf::st_write(DB_AllGPS_sf_wgs84, "data_files/DB_AllGPS_sf_
 
 ```{r CD data}
 
-CD_sf_wgs84 <- st_transform(CD_sf, crs = 4326)
-#4326 is the EPSG code for the WGS84 system, which uses degrees of latitude and longitude.
+CD_sf_wgs84 <- st_transform(CD_sf, crs = 4326) #4326 is the EPSG code for the WGS84 system, which uses degrees of latitude and longitude.
+
+
+#outlier:
+CD_sf_wgs84 <- CD_sf_wgs84 |>
+  filter(landmark_id != "Migration_Den")
 
 # save the lat long data points into a shapefile 
 CD_sf_wgs84 <- sf::st_write(CD_sf_wgs84, "data_files/CD_sf_wgs84.shp")
@@ -839,7 +861,9 @@ CD_sf_wgs84 <- sf::st_write(CD_sf_wgs84, "data_files/CD_sf_wgs84.shp")
 
 # 3. Prepare RSF data
 
-The first step in doing a RSF, is to create random points on the territory. To do so, I will take the clans' MCPs as the home range of the clans, and generate random points in the polygons created. This will create a database of used and available points. The used points are the den locations known, and the available are probably all the adjacent points on the territory.
+Before we can run an RSF, we need to prepare the database that will be used. The first step for that is to get our used GPS points, in this case, it is the den locations that were extracted and put in `CD_for_map` or `CD_sf` (CD = Communal Den). The second step is to create the clans' MCP (Minimum Convex Polygon). We will generate the 95% MCP and 100% MCP.
+
+With the used points and each clans MCP, we will be able to generate random points in their respective territories. I will attribute 10 random points (available points) to the used points. To do so, I will take the clans' MCPs as the home range of the clans, and generate random points in the polygons created. This will create a database of used and available points. The used points are the den locations known, and the available are all the adjacent points in the territory.
 
 I need to determine how many points I want to sample for each points used. For example, 5 points per used points.
 

@@ -126,12 +126,7 @@ CD_all_data <- sf::st_read("data_files/CD_all_data.shp")
 Let's get rid of Migration den in happy zebra that is not at all at the right place:
 ```{r Data manip}
 
-DB_AllGPS_sf_wgs84 <- DB_AllGPS_sf_wgs84 |>
-  filter(lndmrk_ != "Migration_Den")
 
-CD_sf_wgs84 <- CD_sf_wgs84 |>
-  mutate(clan = str_replace_all(clan, "\\.", "")) |>
-  filter(lndmrk_ != "Migration_Den")
 
 CD_sf_talekm_wgs84 <- CD_sf_talekm_wgs84 |> 
   mutate(clan = str_replace_all(clan, "\\.", "")) |>
