@@ -924,6 +924,9 @@ Saving as a html file
 
 htmlwidgets::saveWidget(CD_peryear_mapleaflet, file = "Maps/CD_peryear_mapleaflet.html", selfcontained = TRUE)
 
+# Saving it as a R object to reuse in Covariables:
+saveRDS(CD_peryear_mapleaflet, "Maps/CD_peryear_mapleaflet.rds")
+
 ```
 
 ### iii) Basemap clan (leaflet)

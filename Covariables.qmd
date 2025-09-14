@@ -327,41 +327,28 @@ write.csv2(lions_data_per_clan, "data_files/lions_data_per_clan.csv", row.names 
 
 
 
-### iv) Lions map
+### 1.1.5. Map
 
 ```{r}
 
-str(CD_lions_wgs84)
+# Reload our base map CD_peryear_mapleaflet
+CD_peryear_mapleaflet <- readRDS("Maps/CD_peryear_mapleaflet.rds")
 
-# Add lion points in red, sized by number of lions
+
 lion_mapleaflet <- CD_peryear_mapleaflet |>
-  addCircleMarkers(data = CD_lions_wgs84,
+  addCircleMarkers(data = DB_lions_wgs84,
                    color = "red",
-                   group = CD_lions_wgs84$year,
-                   radius = ~num_lin,   
-                   fillOpacity = 0.8,
-                   popup = ~paste("Year:", year, "<br>", 
-                                  "Number of lions:", num_lin, "<br>",
-                                  "Session ID:", session))
-
-CD_leaflet_lion
-
-
-# not sized by number:
-CD_leaflet_lion2 <- CD_leaflet_inter |>
-  addCircleMarkers(data = CD_lions_wgs84,
-                   color = "red",
-                   group = CD_lions_wgs84$year,
+                   group = DB_lions_wgs84$year,
                    fillOpacity = 0.8,
                    radius = 1,
                    popup = ~paste("Year:", year, "<br>", 
-                                  "Number of lions:", num_lin, "<br>",
+                                  "Number of lions:", num_lion, "<br>",
                                   "Session ID:", session))
 
-CD_leaflet_lion2
+lion_mapleaflet
 
 #save
-htmlwidgets::saveWidget(CD_leaflet_lion2, file = "Maps/CD_leaflet_lion2.html", selfcontained = TRUE)
+htmlwidgets::saveWidget(lion_mapleaflet, file = "Maps/lion_mapleaflet.html", selfcontained = TRUE)
 
 
 ```

@@ -964,3 +964,22 @@ rp_clans_MCP <- random_points(mcp95_clan_sf, n=4000, presence = presence_track)
 plot(rp_clans_MCP)
 
 ```
+
+
+
+## Lion map sized by num of lions
+```{r}
+# Add lion points in red, sized by number of lions
+lion_sized_mapleaflet <- CD_peryear_mapleaflet |>
+  addCircleMarkers(data = DB_lions_wgs84,
+                   color = "red",
+                   group = DB_lions_wgs84$year,
+                   radius = ~num_lion,   
+                   fillOpacity = 0.8,
+                   popup = ~paste("Year:", year, "<br>", 
+                                  "Number of lions:", num_lion, "<br>",
+                                  "Session ID:", session))
+
+lion_sized_mapleaflet
+```
+
