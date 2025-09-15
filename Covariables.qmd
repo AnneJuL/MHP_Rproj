@@ -77,11 +77,27 @@ load_all_tables()
 
 ```{r Load dataframe}
 
-RandomPointsCD_yearly_data <- sf::st_read("data_files/RandomPointsCD_yearly_data.shp")
+RandomPointsCD_year_data <- sf::st_read("data_files/RandomPointsCD_year_data.shp")
 
 ```
 
 # 1. Installing rgee
+
+I will use rgee package to get different spatial covariables : 
+
+-   Land cover (bush vs plains, etc.)\*
+
+-   Altitude\*
+
+-   Distance to edge of territory\*
+
+-   Distance to water\*
+
+-   NDVI
+
+
+rgee is a package that is use to call Google Earth Engine API in R. Google Earth Engine is a cloud-based platform designed for planetary-scale environmental data analysis, offering access to a vast archive of remote sensing data and the ability to perform geospatial analysis on Google's infrastructure. While Google Earth Engine officially supports Python and JavaScript client libraries, rgee bridges this gap for R users by utilizing the reticulate package to wrap the Earth Engine Python API. This allows R users to interact with GEE and leverage its capabilities using a familiar R interface, facilitating rapid development and integration with other open-source R packages for spatial data analysis.
+
 
 Setting up a google earth engine project first.
 
@@ -112,12 +128,15 @@ library(rgeeExtra)
 
 #Initialize EE 
 ee_Initialize()
-#important to initialize earth engine without the user and project argument here:
+#important to initialize earth engine without the user and project argument here
+
+#To get credentials: (need to run it once in a while when ee_Initialize doesn't work)
+ee_Authenticate()
 
 ```
 
 ## 1.1. Checking 
-The ee_check() function will help you for checking the sanity of your rgee installation and dependencies.
+The ee_check() function will help for checking the sanity of the rgee installation and dependencies.
 
 - ee_check_python() - Python version
 - ee_check_credentials() - Google Drive and GCS credentials
@@ -811,25 +830,145 @@ RandomPointsCD_yearly_data$dst_tl <- as.numeric(st_distance(RandomPointsCD_yearl
 
 ## 1.3. Land cover
 
-Now we want to get the land cover for the Masaai Mara. With this we will be able to get those covariables:
 
--   Land cover (bush vs plains, etc.)\*
+### 1.3.1. Masai Mara geometry
 
--   Altitude\*
+I will use the package rgee (Google Earth Engine for R), which was installed in section 1.
 
--   Distance to edge of territory\*
+First, we will get the Masai MAra polygon, which will be use to extract the land cover for our used and available points in `RandomPointsCD_yearly_data`.
+Here, we’ll query the WDPA protected-areas layer in GEE and filter for "Masai Mara" to avoid manually drawing or copying coordinates.
+```{r Masai Mara}
 
--   Distance to water\*
+# WDPA featurecollection (server-side)
+wdpa <- ee$FeatureCollection("WCMC/WDPA/current/polygons")
 
+# filter for features whose NAME contains "Masai Mara"
+mara_fc <- wdpa$filter(ee$Filter$stringContains('NAME', 'Masai Mara'))
+
+mara_geom <- mara_fc$geometry()   # keep geometry in EE
+
+#Quick map to see if we got the right place:
+Map$centerObject(mara_geom, zoom = 10)
+Map
+```
+
+
+
+### 1.3.2. Extract land cover
+
+Now we extract the land cover. We will use the ESA WorldCover dataset, which is a 10m global land cover with 11 classes. It is supposedely great for small-scale features like our den locations. This is going to be for 2020 landcover.
+
+See: 
+- https://developers.google.com/earth-engine/datasets/catalog/ESA_WorldCover_v100?hl=fr
+- https://esa-worldcover.org/en
+- https://worldcover2020.esa.int/viewer
+- https://www.arcgis.com/home/item.html?id=e28b7e1da5414010ba4f47dd5a3c3ebb (for the classes code)
 
 
 ```{r}
+# Load land cover (WorldCover 10m)
+WorldCover <- ee$ImageCollection("ESA/WorldCover/v100")$first()$select("Map")
+
+# Clip to Mara (still server-side)
+MasaiMara_landcover_WC <- WorldCover$clip(mara_geom)
+
+# quick map to see (rgee interactive map):
+Map$addLayer(MasaiMara_landcover_WC, list(bands = "Map"), "WorldCover 10m (Map)")
+Map
+
+```
+
+
+Now we sample the landcover at our used and random points :
+```{r}
+# Sample at your points (points_sf is your sf dataframe of den + available points)
+RandomPointsCD_year_data_ee <- sf_as_ee(RandomPointsCD_year_data)
+
+RandomPointsCD_data_sampled <- MasaiMara_landcover_WC$sampleRegions(
+  collection = RandomPointsCD_year_data_ee,
+  scale = 10,
+  geometries = TRUE
+)
+
+# Bring only the sampled results to R (much smaller)
+RandomPointsCD_landcover <- ee_as_sf(RandomPointsCD_data_sampled)
+
+
+```
+
+```{r}
+
+RandomPointsCD_landcover <- RandomPointsCD_landcover |>
+  mutate(landcover = dplyr::recode(Map,
+    `10` = "Tree",
+    `20` = "Shrub",
+    `30` = "Grass",
+    `40` = "Cropland",
+    `50` = "Built-up",
+    `60` = "Bare",
+    `80` = "Water",
+    `90` = "Wetland"))
+
+```
+
+
+### 1.3.3. Map
+
+```{r}
+# Color palette for land cover
+pal_lc <- colorFactor(palette = "Set2",  # or "viridis", or custom c("green","yellow",...)
+                      domain = RandomPointsCD_landcover$landcover)
+
+# keeping only the used points
+CD_landcover <- RandomPointsCD_landcover |>
+  filter(case == 1)
+
+
+# make a base map
+CD_landcover_mapleaflet <- leaflet(CD_landcover) |>
+  addTiles()
+
+# loop over clans and add each as a separate group
+for (cl in unique(CD_landcover$clan)) {
+  CD_landcover_mapleaflet <- CD_landcover_mapleaflet |>
+    addCircleMarkers(
+      data = filter(CD_landcover, clan == cl),
+      color = ~pal_lc(landcover),
+      fillOpacity = 0.8,
+      group = cl,
+      radius = 3,
+      stroke = FALSE,
+      popup = ~paste("Clan:", clan, "<br>", 
+                     "LC:", landcover, "<br>",
+                     "Landmark:", lndmrk_))
+}
+
+# add toggle control
+CD_landcover_mapleaflet <- CD_landcover_mapleaflet |>
+  addLayersControl(
+    overlayGroups = unique(CD_landcover$clan),
+    options = layersControlOptions(collapsed = FALSE)) |>
+  addLegend("bottomright", pal = pal_lc, values = ~landcover,
+            title = "Land cover", opacity = 1)
+
+CD_landcover_mapleaflet
+
+```
+
+```{r Save}
+
+#save
+htmlwidgets::saveWidget(CD_landcover_mapleaflet, file = "Maps/CD_landcover_mapleaflet.html", selfcontained = TRUE)
+
 
 ```
 
 
 
+## 1.4. Altitude
+```{r}
 
+```
 
 
 

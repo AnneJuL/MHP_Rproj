@@ -763,11 +763,11 @@ This is the locations of all the hyenas seen in the 4 territories:
 
 # outlier:
 DB_AllGPS_sf <- DB_AllGPS_sf_clean |>
-  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den")) 
+  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den", "Mausoleun_at_Halicarnassus_Den")) 
 
 
 # Saving it:
-DB_AllGPS_sf <- sf::st_write(DB_AllGPS_sf, "data_files/DB_AllGPS_sf.shp")
+DB_AllGPS_sf <- sf::st_write(DB_AllGPS_sf, "data_files/DB_AllGPS_sf.shp", delete_dsn = TRUE)
 
 ```
 
@@ -785,10 +785,10 @@ CD_sf <- st_as_sf(CD_for_map, coords = c("utme", "utmn"), crs = 32736) #EPSG cod
 
 #outlier
 CD_sf <- CD_sf |>
-  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den")) 
+  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
 
 #Save the sf dataframe - can only do it once when it is not created before
-CD_sf <- sf::st_write(CD_sf, "data_files/CD_sf.shp")
+CD_sf <- sf::st_write(CD_sf, "data_files/CD_sf.shp", delete_dsn = TRUE)
 
 ```
 
@@ -821,10 +821,10 @@ DB_AllGPS_sf_wgs84 <- st_transform(DB_AllGPS_sf, crs = 4326)
 
 # outlier:
 DB_AllGPS_sf_wgs84 <- DB_AllGPS_sf_wgs84 |>
-  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den")) 
+  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den", "Mausoleun_at_Halicarnassus_Den")) 
 
 # saving it:
-DB_AllGPS_sf_wgs84 <- sf::st_write(DB_AllGPS_sf_wgs84, "data_files/DB_AllGPS_sf_wgs84.shp")
+DB_AllGPS_sf_wgs84 <- sf::st_write(DB_AllGPS_sf_wgs84, "data_files/DB_AllGPS_sf_wgs84.shp", delete_dsn = TRUE)
 
 ```
 
@@ -837,10 +837,10 @@ CD_sf_wgs84 <- st_transform(CD_sf, crs = 4326) #4326 is the EPSG code for the WG
 
 #outlier:
 CD_sf_wgs84 <- CD_sf_wgs84 |>
-  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den")) 
+  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
 
 # save the lat long data points into a shapefile 
-CD_sf_wgs84 <- sf::st_write(CD_sf_wgs84, "data_files/CD_sf_wgs84.shp")
+CD_sf_wgs84 <- sf::st_write(CD_sf_wgs84, "data_files/CD_sf_wgs84.shp", delete_dsn = TRUE)
 
 ```
 
@@ -1383,52 +1383,61 @@ htmlwidgets::saveWidget(AllGPS_yearly_95MCPs_mapleaflet, file = "Maps/AllGPS_yea
 Great, now that we have our 95% MCPs based on all GPS points of the hyenas and the GPS locations of the communal dens, we can proceed to generate random points and put all that in a dataframe that will be use in our RSF (See covariables quarto to see all the covariables added to that dataframe).
 
 ```{r presence track}
+
 #Convert your sf object to a data frame with coordinates: 
+CD_sf_wgs84_df <- CD_sf_wgs84 |> 
+  mutate(long = sf::st_coordinates(geometry)[,1], lat = sf::st_coordinates(geometry)[,2]) 
 
-CD_sf_wgs84_df <- CD_sf_wgs84 |> mutate(long = sf::st_coordinates(geometry)[,1], lat = sf::st_coordinates(geometry)[,2]) 
-
-#Change the CD_sf_wgs84 into a track_xy object 
-
-presence_track <- make_track(CD_sf_wgs84_df, long, lat, crs = 4326, clan = clan, year = year)
+#Change the CD_sf_wgs84_df into a track_xy object 
+presence_track <- make_track(CD_sf_wgs84_df, long, lat, crs = 4326, clan = clan, year = year, landmark_id = landmark_id)
 ```
 
+
+### 4.2.1. General MCP
 This one is with the general MCP
+
 ```{r 10 random per used}
 
-
-# Function to generate 10 random points per used point
+# Function to generate 10 random points per used
 generate_randoms <- function(pres_row, mcp_polygons, n = 10) {
-  # Extract clan from the presence row
   clan_i <- pres_row$clan
+  year_i <- pres_row$year
+  landmark_id_i <- pres_row$landmark_id
   
-  # Subset MCP polygon for this clan
-  mcp_i <- mcp_polygons %>% filter(clan == clan_i)
+  mcp_i <- mcp_polygons %>% filter(clan == clan_i, year == year_i)
   
-  # Generate n random points inside this MCP
-  rand_pts <- random_points(mcp_i, n = n, presence = pres_row)
+  if (nrow(mcp_i) == 0) return(NULL)
   
-  # Convert to sf
-  rand_sf <- st_as_sf(rand_pts, coords = c("x_", "y_"), crs = st_crs(mcp_polygons))
+  # Use sf::st_sample directly to get n points inside polygon
+  rand_geom <- st_sample(mcp_i, size = n, exact = TRUE)
   
-  # Add back metadata
-  rand_sf <- rand_sf %>%
-    mutate(clan = clan_i,
-           year = pres_row$year,  # still keep year from the presence row
-           case_ = 0)
+  rand_sf <- st_sf(
+    geometry = rand_geom,
+    clan = clan_i,
+    year = year_i,
+    landmark_id = landmark_id_i,
+    case_ = 0,
+    crs = st_crs(mcp_polygons)
+  )
   
   return(rand_sf)
 }
 
-# Apply over all presence points (this gives me all the available points, not the used)
-RandomPointsCD_data <- map_dfr(1:nrow(presence_track), ~ generate_randoms(presence_track[.x, ], mcp95_clan_sf, n = 10))
+mcp95_clan_sf <- mcp95_clan_sf |>
+  st_make_valid()
 
-# Combine presences (case_ = 1) and randoms (case_ = 0)
+RandomPointsCD_data <- map_dfr(
+  1:nrow(presence_track),
+  ~ generate_randoms(presence_track[.x, ], mcp95_clan_year_sf, n = 10))
+
+# Combine used and random points
 RandomPointsCD_data <- bind_rows(
   presence_track |>
     st_as_sf(coords = c("x_", "y_"), crs = st_crs(mcp95_clan_sf)) |>
     mutate(case_ = 1),
   RandomPointsCD_data)
 
+# Clean up naming
 RandomPointsCD_data <- RandomPointsCD_data |>
   rename(case = case_)
 
@@ -1440,36 +1449,39 @@ RandomPointsCD_data <- sf::st_write(RandomPointsCD_data, "data_files/RandomPoint
 ```
 
 
-
+### 4.2.2. Yearly MCPs
 Now this one is with the yearly MCP
 ```{r}
 # Function to generate random points per presence row
 generate_randoms <- function(pres_row, mcp_polygons, n = 10) {
-  clan_i <- pres_row$clan
-  year_i <- pres_row$year
+  # Extract identifiers from the presence row
+  clan_i       <- pres_row$clan
+  year_i       <- pres_row$year
+  landmark_id_i <- pres_row$landmark_id
   
-  # Subset to the correct clan-year MCP
-  mcp_i <- mcp_polygons %>% filter(clan == clan_i, year == year_i)
+  # Subset to the MCP polygon for the *same clan and year*
+  mcp_i <- mcp_polygons %>%
+    filter(clan == clan_i, year == year_i)
   
-  if (nrow(mcp_i) == 0) {
-    warning(paste("No MCP found for clan", clan_i, "in year", year_i))
-    return(NULL)
-  }
+  # If no polygon found (e.g. missing MCP for that year/clan), skip
+  if (nrow(mcp_i) == 0) return(NULL)
   
-  # Generate n random points inside the MCP polygon
-  rand_pts <- random_points(mcp_i, n = n, presence = pres_row)
+  # Sample n random points inside this year's MCP
+  rand_geom <- st_sample(mcp_i, size = n, exact = TRUE)
   
-  # Convert to sf
-  rand_sf <- st_as_sf(rand_pts, coords = c("x_", "y_"), crs = st_crs(mcp_polygons))
-  
-  # Add metadata
-  rand_sf <- rand_sf %>%
-    mutate(clan = clan_i,
-           year = year_i,
-           case_ = 0)
+  # Wrap sampled points into an sf object with metadata
+  rand_sf <- st_sf(
+    clan        = clan_i,
+    year        = year_i,
+    landmark_id = landmark_id_i,
+    case_       = 0,                 # available points
+    geometry    = rand_geom,
+    crs         = st_crs(mcp_polygons)
+  )
   
   return(rand_sf)
 }
+
 
 mcp95_clan_year_sf <- mcp95_clan_year_sf |>
   st_make_valid()
@@ -1477,8 +1489,7 @@ mcp95_clan_year_sf <- mcp95_clan_year_sf |>
 # Apply over all presence points
 RandomPointsCD_yearly_data <- map_dfr(
   1:nrow(presence_track),
-  ~ generate_randoms(presence_track[.x, ], mcp95_clan_year_sf, n = 10)
-)
+  ~ generate_randoms(presence_track[.x, ], mcp95_clan_year_sf, n = 10))
 
 # Combine used and random points
 RandomPointsCD_yearly_data <- bind_rows(
@@ -1497,14 +1508,16 @@ RandomPointsCD_yearly_data <- RandomPointsCD_yearly_data |>
 
 ```{r Save}
 
-RandomPointsCD_yearly_data <- sf::st_write(RandomPointsCD_yearly_data, "data_files/RandomPointsCD_data.shp")
+RandomPointsCD_yearly_data <- sf::st_write(RandomPointsCD_yearly_data, "data_files/RandomPointsCD_year_data.shp")
 
 ```
 
 
 
 
-### 4.2.1. Plots
+### 4.2.3. Plots
+
+Using the yearly data points:
 ```{r}
 
 RandomPointsCD_mapleaflet <- leaflet() |> 
@@ -1512,13 +1525,13 @@ RandomPointsCD_mapleaflet <- leaflet() |>
 
   # Then plot random (case_ == 0) in blue (will appear on top)
   addCircleMarkers(
-    data = RandomPointsCD_data[RandomPointsCD_data$case == 0, ],
+    data = RandomPointsCD_yearly_data[RandomPointsCD_yearly_data$case == 0, ],
     color = "blue", radius = 1, fillOpacity = 0.8,
     group = "Random"
   ) |>
    # First plot used (case_ == 1) in red
   addCircleMarkers(
-    data = RandomPointsCD_data[RandomPointsCD_data$case == 1, ],
+    data = RandomPointsCD_yearly_data[RandomPointsCD_yearly_data$case == 1, ],
     color = "red", radius = 1, fillOpacity = 0.8,
     group = "Used"
   ) |>
@@ -1539,45 +1552,16 @@ htmlwidgets::saveWidget(RandomPointsCD_mapleaflet, file = "Maps/RandomPointsCD_m
 ```
 
 
-```{r}
-
-RandomPointsCD_yearly_mapleaflet <- leaflet() |> 
-  addTiles() |>
-
-  # Then plot random (case_ == 0) in blue (will appear on top)
-  addCircleMarkers(
-    data = RandomPointsCD_yearly_data[RandomPointsCD_yearly_data$case == 0, ],
-    color = "blue", radius = 1, fillOpacity = 0.8,
-    group = "Random"
-  ) |>
-   # First plot used (case_ == 1) in red
-  addCircleMarkers(
-    data = RandomPointsCD_yearly_data[RandomPointsCD_yearly_data$case == 1, ],
-    color = "red", radius = 1, fillOpacity = 0.8,
-    group = "Used"
-  ) |>
-  addLayersControl(
-    overlayGroups = c("Used", "Random"),
-    options = layersControlOptions(collapsed = FALSE)
-  )
-
-RandomPointsCD_yearly_mapleaflet
-
-```
-
-```{r}
-# Save the map
-htmlwidgets::saveWidget(RandomPointsCD_yearly_mapleaflet, file = "Maps/RandomPointsCD_yearly_mapleaflet.html", selfcontained = TRUE)
-
-```
-
-
-
+Adding to the AllGPS
 ```{r}
 
 # Adding the random point in the AllGPS_yearly_95MCPs_mapleaflet
 # New map object
-AllGPS_yearly_95MCPs_withRandom_mapleaflet <- leaflet() |> addTiles()
+CD_yearly_95MCPs_withRandom_mapleaflet <- leaflet() |> addTiles()
+
+pal2 <- colorFactor(palette = "viridis", domain = DB_AllGPS_sf_wgs84$clan)
+years2 <- unique(DB_AllGPS_sf_wgs84$year)
+
 
 for (yr in years2) {
   
@@ -1586,7 +1570,7 @@ for (yr in years2) {
   random_year  <- RandomPointsCD_yearly_data |> filter(year == yr)
   
   # 1. Random points (back layer)
-  AllGPS_yearly_95MCPs_withRandom_mapleaflet <- AllGPS_yearly_95MCPs_withRandom_mapleaflet |>
+  CD_yearly_95MCPs_withRandom_mapleaflet <- CD_yearly_95MCPs_withRandom_mapleaflet |>
     addCircleMarkers(data = random_year,
                      color = "red",
                      radius = 1,
@@ -1595,7 +1579,7 @@ for (yr in years2) {
                      group = paste0("Year ", yr))
   
   # 2. Used clan points (middle layer)
-  AllGPS_yearly_95MCPs_withRandom_mapleaflet <- AllGPS_yearly_95MCPs_withRandom_mapleaflet |>
+  CD_yearly_95MCPs_withRandom_mapleaflet <- CD_yearly_95MCPs_withRandom_mapleaflet |>
     addCircleMarkers(data = points_year,
                      color = ~pal2(clan),
                      radius = 1,
@@ -1606,7 +1590,7 @@ for (yr in years2) {
                      group = paste0("Year ", yr))
   
   # 3. MCP polygons (top layer)
-  AllGPS_yearly_95MCPs_withRandom_mapleaflet <- AllGPS_yearly_95MCPs_withRandom_mapleaflet |>
+  CD_yearly_95MCPs_withRandom_mapleaflet <- CD_yearly_95MCPs_withRandom_mapleaflet |>
     addPolygons(data = mcp_year,
                 color = "red",
                 fillColor = "none",
@@ -1618,7 +1602,7 @@ for (yr in years2) {
 }
 
 # Add controls + legend
-AllGPS_yearly_95MCPs_withRandom_mapleaflet <- AllGPS_yearly_95MCPs_withRandom_mapleaflet |>
+CD_yearly_95MCPs_withRandom_mapleaflet <- CD_yearly_95MCPs_withRandom_mapleaflet |>
   addLayersControl(
     baseGroups = paste0("Year ", years2),
     options = layersControlOptions(collapsed = FALSE)
@@ -1627,14 +1611,14 @@ AllGPS_yearly_95MCPs_withRandom_mapleaflet <- AllGPS_yearly_95MCPs_withRandom_ma
   addLegend("bottomright", pal = pal2, values = DB_AllGPS_sf_wgs84$clan,
             title = "Clan", opacity = 1)
 
-AllGPS_yearly_95MCPs_withRandom_mapleaflet
+CD_yearly_95MCPs_withRandom_mapleaflet
 
 ```
 
 
 ```{r}
 # Save the map
-htmlwidgets::saveWidget(AllGPS_yearly_95MCPs_withRandom_mapleaflet, file = "Maps/AllGPS_yearly_95MCPs_withRandom_mapleaflet.html", selfcontained = TRUE)
+htmlwidgets::saveWidget(CD_yearly_95MCPs_withRandom_mapleaflet, file = "Maps/CD_yearly_95MCPs_withRandom_mapleaflet.html", selfcontained = TRUE)
 
 ```
 
