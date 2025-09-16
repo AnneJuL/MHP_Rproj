@@ -98,7 +98,7 @@ CD_lions_wgs84 <- sf::st_read("data_files/CD_lions_wgs84.shp")
 
 
 
-CD_all_data <- sf::st_read("data_files/CD_all_data.shp")
+CD_for_map <- readr::read_csv2("data_files/CD_for_map.csv")
 
 
 ```

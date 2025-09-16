@@ -1140,6 +1140,26 @@ htmlwidgets::saveWidget(AllGPS_location_perclan_mapleaflet, file = "Maps/AllGPS_
 ```
 
 
+## 3.2. Tables 
+
+```{r}
+
+CD_for_map$year <- as.character(CD_for_map$year)
+
+CD_yearly <- CD_for_map |>
+  group_by(year, clan) |>
+  summarise(CD_num = n()) |>
+  arrange(year, clan)
+
+CD_yearly
+
+CD_yearly_tab <- flextable(CD_yearly)
+save_as_html(CD_yearly_tab, path = "Tables/CD_yearly_tab.html")
+
+
+```
+
+
 
 # 4. Prepare RSF data
 

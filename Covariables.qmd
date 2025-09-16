@@ -105,10 +105,6 @@ The first time I need to install conda, create the rgee environment within the c
 
 I followed the steps here to have it finally worked: https://gis.stackexchange.com/questions/473730/authentification-error-when-installing-rgee-in-rstudio?newreg=3674f3f594ee4f91856aa2e5df5b204d
 
-Here are the lines that needed to be run the first time, but now I don't need them anymore, just the ones in the code box.
-
-- install_packages("rgee")
-- reticulate::conda_install(envname = "rgee", packages = "earthengine-api=0.1.370", channel = "conda-forge", python_version = "3.9")
 
 ```{r}
 #to get rgeeExtra, to use things like the gif animation
@@ -116,6 +112,13 @@ Here are the lines that needed to be run the first time, but now I don't need th
 
 ```
 
+Here are the lines that needed to be run the first time, but now I don't need them anymore. Might need to rerun them when ee_Initialize doesn't work.
+```{r }
+#library(reticulate)
+
+#install.packages("rgee")
+#reticulate::conda_install(envname = "rgee", packages = "earthengine-api=0.1.370", channel = "conda-forge", python_version = "3.9")
+```
 
 ```{r}
 library(reticulate)
@@ -126,12 +129,25 @@ reticulate::use_condaenv("rgee", required = TRUE)
 library(rgee)
 library(rgeeExtra)
 
+```
+
+
+Initialize rgee
+```{r}
 #Initialize EE 
 ee_Initialize()
 #important to initialize earth engine without the user and project argument here
+```
 
+
+This will need to be run when ee_Initialize is not working.
+```{r}
 #To get credentials: (need to run it once in a while when ee_Initialize doesn't work)
 ee_Authenticate()
+
+ee_clean_user_credentials()
+#toforce it:
+ee_Authenticate(auth_mode = "notebook")
 
 ```
 
@@ -964,11 +980,65 @@ htmlwidgets::saveWidget(CD_landcover_mapleaflet, file = "Maps/CD_landcover_maple
 ```
 
 
+### 1.3.4. Table
+
+```{r}
+
+landcover_table_sum <- CD_landcover |>
+  st_drop_geometry() |>
+  group_by(landcover) |>
+  summarise(n_used = n()) |>
+  arrange(desc(n_used))
+
+landcover_table_sum
+
+landcover_tab_sum <- flextable(landcover_table_sum)
+save_as_html(landcover_tab_sum, path = "Tables/landcover_tab_sum.html")
+
+
+```
+
+
+
 
 ## 1.4. Altitude
 ```{r}
 
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
