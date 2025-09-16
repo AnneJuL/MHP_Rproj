@@ -87,7 +87,7 @@ I will use rgee package to get different spatial covariables :
 
 -   Land cover (bush vs plains, etc.)\*
 
--   Altitude\*
+-   Elevation\*
 
 -   Distance to edge of territory\*
 
@@ -853,12 +853,12 @@ talek_center <- data.frame(
 talek_sf <- st_as_sf(talek_center, coords = c("lon", "lat"), crs = 4326)
 
 # Transform to a projected CRS in meters (UTM zone for this area: 36S)
-RandomPointsCD_yearly_data_talek <- st_transform(RandomPointsCD_yearly_data, 32736)    # EPSG 32736 = WGS 84 / UTM zone 36S
+RandomPointsCD_year_data_talek <- st_transform(RandomPointsCD_year_data , 32736)    # EPSG 32736 = WGS 84 / UTM zone 36S
 talek_sf_m <- st_transform(talek_sf, 32736)
 
 
 # Calculate distances in meters
-RandomPointsCD_yearly_data$dst_tl <- as.numeric(st_distance(RandomPointsCD_yearly_data_talek, talek_sf_m))
+RandomPointsCD_year_data$dst_tl <- as.numeric(st_distance(RandomPointsCD_year_data_talek, talek_sf_m))
 
 
 ```
@@ -1021,10 +1021,16 @@ save_as_html(landcover_tab_sum, path = "Tables/landcover_tab_sum.html")
 
 ```
 
+Save dataframe:
+```{r}
+
+RandomPointsCD_landcover <- sf::st_write(RandomPointsCD_landcover, "data_files/RandomPointsCD_landcover.shp", delete_dsn = TRUE)
+
+```
 
 
 
-## 1.4. Altitude
+## 1.4. Elevation
 ```{r}
 
 ```
