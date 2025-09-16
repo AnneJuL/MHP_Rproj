@@ -61,7 +61,8 @@ library(amt) # for the RSF
 library(adehabitatHR) # for mcp
 library(brms)
 library(glmmTMB) # to make RSF models
-
+library(lme4)
+library(sjPlot)
 
 library(purrr)
 
@@ -73,7 +74,6 @@ library(purrr)
 Load data files
 
 ```{r Files}
-
 #shapefiles created in CD_data
 
 # To make the MCP:
@@ -86,44 +86,23 @@ DB_AllGPS_sf_wgs84 <- sf::st_read("data_files/DB_AllGPS_sf_wgs84.shp")
 CD_sf <- sf::st_read("data_files/CD_sf.shp")
 CD_sf_wgs84 <- sf::st_read("data_files/CD_sf_wgs84.shp")
 
-CD_sf_talekm <- sf::st_read("data_files/CD_sf_talekm.shp")
-CD_sf_talekm_wgs84 <- sf::st_read("data_files/CD_sf_talekm_wgs84.shp")
-
-
-
 
 # Lions data
 CD_sf_lions <- sf::st_read("data_files/CD_sf_lions.shp")
 CD_lions_wgs84 <- sf::st_read("data_files/CD_lions_wgs84.shp")
 
 
+RandomPointsCD_landcover <- sf::st_read("data_files/RandomPointsCD_landcover.shp")
+```
 
+
+```{r Files}
 CD_for_map <- readr::read_csv2("data_files/CD_for_map.csv")
 
-
 ```
 
-Let's get rid of Migration den in happy zebra that is not at all at the right place:
 
-```{r Data manip}
-
-
-
-CD_sf_talekm_wgs84 <- CD_sf_talekm_wgs84 |> 
-  mutate(clan = str_replace_all(clan, "\\.", "")) |>
-  filter(lndmrk_ != "Migration_Den")
-
-
-
-CD_lions_wgs84 <- CD_lions_wgs84 |> 
-  mutate(clan = str_replace_all(clan, "\\.", "")) |>
-  select(-date)
-
-
-
-```
-
-# 1. MOdelling the RSF
+# 1. Modelling the RSF
 
 ALSO, we need to control for the obs effort (some years field team would go more on obs vs other years/season). I guess with year as a random, and month as a covariable, it does control for this...
 
@@ -145,31 +124,20 @@ If you want multi-year matching (landcover year of den use), pick the dataset ye
 
 I will separate the Talek points with the triangle ones, so that I can make a model with the Talek town borders as a variable.
 
-```{r}
-
-rsf1 <- fit_rsf(CD_RSF_data, formula = used ~ 1 + (1|year) + (1|clan), 
-                family = binomial)
-
-
-
-summary(rsf1)
-plot(rsf1)
-
-```
 
 With brms:
-
 ```{r brms}
 
-
-brm_RSF <- brm(case_ ~ 1 + (1|clan) + (1|year),
-               data = CD_RSF_data, 
-               family = bernoulli(),
-               cores = 4, 
-               chains = 4)
+brm_RSF <- brms::brm(case ~ landcover + (1|year) + (1|clan),
+                     data = RandomPointsCD_landcover, 
+                     family = bernoulli(),
+                     cores = 4, 
+                     chains = 4)
 
 
 ```
+
+
 
 ## 1.2. Distance to Talek model
 
