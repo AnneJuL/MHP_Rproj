@@ -443,6 +443,15 @@ DF_lions_sum <- DF_lions |>
 
 ```
 
+```{r}
+DF_lndmk <- tblLandmarks |>
+  select(landmark_id, utme, utmn) |>
+  mutate(landmark_id = str_replace_all(landmark_id, " ", "_")) |>
+  filter(!(landmark_id == "Marsh_Den" & (is.na(utme) | is.na(utmn))))
+
+```
+
+
 I also need to join the session ID to the location landmark dataframe.
 
 ```{r Join Session ID to Landmark location}
@@ -605,7 +614,9 @@ DF_lions_data_clean <- DF_lions_data_clean |>
   filter(session != "t115432") |>
   filter(session != "s24841") |>
    #removing the "." in the clan names
+  mutate(clan = str_replace_all(clan, "talekw", "talek")) |>
   mutate(clan = str_replace_all(clan, "\\.", ""))
+
 
   
 
@@ -618,10 +629,10 @@ DF_lions_data_clean <- DF_lions_data_clean |>
 Saving it to shp.
 ```{r}
 
-sf_df_lions <- st_as_sf(DF_lions_data_clean, coords = c("utme", "utmn"), crs = 32736)
+DB_lions_sf <- st_as_sf(DF_lions_data_clean, coords = c("utme", "utmn"), crs = 32736)
 
 #Save the sf dataframe - can only do it once when it is not created before
-DB_lions_sf <- sf::st_write(sf_df_lions, "data_files/DB_lions_sf.shp")
+DB_lions_sf <- sf::st_write(DB_lions_sf, "data_files/DB_lions_sf.shp", delete_dsn = TRUE)
 ```
 
 Change to wgs84
@@ -630,7 +641,7 @@ DB_lions_wgs84 <- st_transform(DB_lions_sf, crs = 4326)
 #4326 is the EPSG code for the WGS84 system, which uses degrees of latitude and longitude.
 
 # save the lat long data points into a shapefile 
-DB_lions_wgs84 <- sf::st_write(DB_lions_wgs84, "data_files/DB_lions_wgs84.shp")
+DB_lions_wgs84 <- sf::st_write(DB_lions_wgs84, "data_files/DB_lions_wgs84.shp", delete_dsn = TRUE)
 
 ```
 
@@ -638,19 +649,31 @@ DB_lions_wgs84 <- sf::st_write(DB_lions_wgs84, "data_files/DB_lions_wgs84.shp")
 ### 1.1.4. Summarize
 ```{r}
 
+# number of lions in each territory for the different years
 lions_data <- DB_lions_sf |>
   st_drop_geometry(lions_data) |>
   group_by(year, clan) |>
-  summarize(n_lion = sum(num_lion))
+  summarize(n_lion = sum(num_lion)) |>
+  arrange(year, clan)
+
+lions_data_tab <- flextable(lions_data)
+save_as_html(lions_data_tab, path = "Tables/lions_data_tab.html")
+
 
 #Save
 write.csv2(lions_data, "data_files/lions_data.csv", row.names = F, quote = F)
 
+
+# Lions per clan over the years
 lions_data_per_clan <- lions_data |>
   group_by(clan) |>
   summarize(n_lion = sum(n_lion))
 
-flextable(lions_data_per_clan)
+
+
+lions_data_perclan_tab <- flextable(lions_data_per_clan)
+save_as_html(lions_data_perclan_tab, path = "Tables/lions_data_perclan_tab.html")
+
 
 #Save
 write.csv2(lions_data_per_clan, "data_files/lions_data_per_clan.csv", row.names = F, quote = F)
