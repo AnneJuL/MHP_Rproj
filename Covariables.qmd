@@ -116,8 +116,8 @@ Here are the lines that needed to be run the first time, but now I don't need th
 ```{r }
 #library(reticulate)
 
-#install.packages("rgee")
-#reticulate::conda_install(envname = "rgee", packages = "earthengine-api=0.1.370", channel = "conda-forge", python_version = "3.9")
+install.packages("rgee")
+reticulate::conda_install(envname = "rgee", packages = "earthengine-api=0.1.370", channel = "conda-forge", python_version = "3.9")
 ```
 
 ```{r}
@@ -390,6 +390,28 @@ animation %>%
 ```
 
 
+
+## 1.3. Masai Mara geometry
+
+Here, we will get the Masai Mara polygon, which will be use to extract the land cover, elevation, water, etc. for our used and available points in `RandomPointsCD_yearly_data`.
+
+Here, we’ll query the WDPA protected-areas layer in GEE and filter for "Masai Mara" to avoid manually drawing or copying coordinates.
+
+
+```{r Masai Mara}
+# WDPA featurecollection (server-side)
+wdpa <- ee$FeatureCollection("WCMC/WDPA/current/polygons")
+
+# filter for features whose NAME contains "Masai Mara"
+mara_fc <- wdpa$filter(ee$Filter$stringContains('NAME', 'Masai Mara'))
+
+mara_geom <- mara_fc$geometry()   # keep geometry in EE
+```
+
+
+
+
+
 # 2. Covariables 
 
 Now we need to create covariables to put in the RSF models. Those will be our potential drivers for communal den locations.
@@ -404,13 +426,14 @@ We have a lot of covariables to create. Here is the list:
 
 -   Land cover (bush vs plains, etc.)\*
 
--   Altitude\*
+-   Elevation\*
 
 -   Distance to edge of territory\*
 
 -   Distance to water\*
 
-- Time of year ? --> I really want to find a way to get this and have a 
+-   Time of year ? 
+            --> I really want to find a way to get this...
 
 
 In more of a post-hoc thing: - Number of cubs at dens
@@ -707,7 +730,7 @@ htmlwidgets::saveWidget(CD_lion_mapleaflet, file = "Maps/CD_lion_mapleaflet.html
 
 ```
 
-### 1.1.6. Calculation of distance
+### 1.1.6. Distance to closest lion sighting
 
 I want to calculate the distance from the den location points to the closest lion sighting.
 
@@ -869,31 +892,9 @@ RandomPointsCD_year_data$dst_tl <- as.numeric(st_distance(RandomPointsCD_year_da
 
 ## 1.3. Land cover
 
-
-### 1.3.1. Masai Mara geometry
-
 I will use the package rgee (Google Earth Engine for R), which was installed in section 1.
 
-First, we will get the Masai MAra polygon, which will be use to extract the land cover for our used and available points in `RandomPointsCD_yearly_data`.
-Here, we’ll query the WDPA protected-areas layer in GEE and filter for "Masai Mara" to avoid manually drawing or copying coordinates.
-```{r Masai Mara}
-
-# WDPA featurecollection (server-side)
-wdpa <- ee$FeatureCollection("WCMC/WDPA/current/polygons")
-
-# filter for features whose NAME contains "Masai Mara"
-mara_fc <- wdpa$filter(ee$Filter$stringContains('NAME', 'Masai Mara'))
-
-mara_geom <- mara_fc$geometry()   # keep geometry in EE
-
-#Quick map to see if we got the right place:
-Map$centerObject(mara_geom, zoom = 10)
-Map
-```
-
-
-
-### 1.3.2. Extract land cover
+### 1.3.1. Extract land cover
 
 Now we extract the land cover. We will use the ESA WorldCover dataset, which is a 10m global land cover with 11 classes. It is supposedely great for small-scale features like our den locations. This is going to be for 2020 landcover.
 
@@ -912,8 +913,8 @@ WorldCover <- ee$ImageCollection("ESA/WorldCover/v100")$first()$select("Map")
 MasaiMara_landcover_WC <- WorldCover$clip(mara_geom)
 
 # quick map to see (rgee interactive map):
-Map$addLayer(MasaiMara_landcover_WC, list(bands = "Map"), "WorldCover 10m (Map)")
-Map
+MasaiMara_landcover_map <- Map$addLayer(MasaiMara_landcover_WC, list(bands = "Map"), "WorldCover 10m (Map)")
+
 
 ```
 
@@ -926,8 +927,7 @@ RandomPointsCD_year_data_ee <- sf_as_ee(RandomPointsCD_year_data)
 RandomPointsCD_data_sampled <- MasaiMara_landcover_WC$sampleRegions(
   collection = RandomPointsCD_year_data_ee,
   scale = 10,
-  geometries = TRUE
-)
+  geometries = TRUE)
 
 # Bring only the sampled results to R (much smaller)
 RandomPointsCD_landcover <- ee_as_sf(RandomPointsCD_data_sampled)
@@ -937,7 +937,7 @@ RandomPointsCD_landcover <- ee_as_sf(RandomPointsCD_data_sampled)
 
 ```{r}
 
-RandomPointsCD_landcover <- RandomPointsCD_landcover |>
+RandomPointsCD_data <- RandomPointsCD_landcover |>
   mutate(landcover = dplyr::recode(Map,
     `10` = "Tree",
     `20` = "Shrub",
@@ -951,7 +951,7 @@ RandomPointsCD_landcover <- RandomPointsCD_landcover |>
 ```
 
 
-### 1.3.3. Map
+### 1.3.2. Map
 
 ```{r}
 # Color palette for land cover
@@ -995,15 +995,67 @@ CD_landcover_mapleaflet
 ```
 
 ```{r Save}
-
 #save
 htmlwidgets::saveWidget(CD_landcover_mapleaflet, file = "Maps/CD_landcover_mapleaflet.html", selfcontained = TRUE)
-
 
 ```
 
 
-### 1.3.4. Table
+
+##### Overlay landcover with Den location:
+```{r Masai Mara + CD Map}
+
+# Visualization parameters (classes + colors)
+landcover_palette <- c(
+  "#006400", # Tree cover
+  "#ffbb22", # Shrubland
+  "#ffff4c", # Grassland
+  "#f096ff", # Cropland
+  "#fa0000", # Built-up
+  "#b4b4b4", # Bare / sparse vegetation
+  "#f0f0f0", # Snow / ice
+  "#0064c8", # Permanent water bodies
+  "#0096a0", # Herbaceous wetland
+  "#00cf75", # Mangroves
+  "#fae6a0", # Moss & lichen
+  "#000000"  # No data
+)
+
+landcover_classes <- c(
+  "Tree cover", "Shrubland", "Grassland", "Cropland", "Built-up",
+  "Bare / sparse", "Snow / Ice", "Water", "Wetland",
+  "Mangroves", "Moss/Lichen", "No data")
+
+MasaiMara_CD_map <- MasaiMara_landcover_map |>
+  # to save it with esri world imagery:
+  addProviderTiles(providers$Esri.WorldImagery) |>
+  addLegend(
+    position = "bottomright",
+    colors = landcover_palette,
+    labels = landcover_classes,
+    title = "ESA WorldCover 2020") |>
+  addCircleMarkers(
+    data = CD_landcover, 
+    color = "red",
+    radius = 1,
+    fillOpacity = 0.9,
+    popup = ~paste("Clan:", clan, "<br>Year:", year))
+
+
+MasaiMara_CD_map
+
+```
+
+```{r}
+#save
+htmlwidgets::saveWidget(MasaiMara_CD_map, file = "Maps/MasaiMara_CD_map.html", selfcontained = TRUE)
+
+```
+
+
+
+
+### 1.3.3. Table
 
 ```{r}
 
@@ -1031,29 +1083,177 @@ RandomPointsCD_landcover <- sf::st_write(RandomPointsCD_landcover, "data_files/R
 
 
 ## 1.4. Elevation
+
+We will use the rgee package again to extrat elevation of the Masai Mara. The dataset is SRTM Digital Elevation (30 m). 
+
+We will use the `mara_geom` to extract the elevation just like I did with the land cover.
+
+```{r}
+
+# 1. Load SRTM DEM
+srtm <- ee$Image("USGS/SRTMGL1_003")
+
+
+# 2. Clip DEM to Masai Mara area
+srtm_mara <- srtm$clip(mara_geom)
+
+# 3. Extract elevation for your points
+RandomPointsCD_elevation <- sf_as_ee(RandomPointsCD_data)
+
+sampled_elevation <- srtm_mara$sampleRegions(
+  collection = RandomPointsCD_elevation,
+  scale = 30,      # resolution in meters
+  geometries = TRUE)
+
+# 4. Bring back to R
+sampled_elevation_sf <- ee_as_sf(sampled_elevation, maxFeatures = 5000)
+
+# 5. Merge back into your dataframe
+RandomPointsCD_data <- sampled_elevation_sf
+
+```
+
+
+### 1.4.1. Map 
+
+```{r}
+
+elev_vis <- list(
+  min = 1200,  # lowest elevation in Mara (adjust if needed)
+  max = 2200,  # highest elevation in Mara
+  palette = c("#e5f5e0", "#a1d99b", "#31a354"))  # light → medium → dark green
+
+
+Map$centerObject(mara_geom, zoom = 9)
+
+Elevation_map <- Map$addLayer(srtm_mara, elev_vis, "Elevation (m)")
+
+```
+
+```{r}
+
+CD_elevation <- RandomPointsCD_data |>
+  filter(case == 1)
+
+CD_elevation_map <- Elevation_map |>
+  # to save it with esri world imagery:
+  addProviderTiles(providers$Esri.WorldImagery) |>
+  
+  addCircleMarkers(
+    data = CD_landcover, 
+    color = "red",
+    radius = 1,
+    fillOpacity = 0.9,
+    popup = ~paste("Clan:", clan, "<br>Year:", year))
+
+
+CD_elevation_map
+
+```
+
+```{r}
+#save
+htmlwidgets::saveWidget(CD_elevation_map, file = "Maps/CD_elevation_map.html", selfcontained = TRUE)
+```
+
+
+
+## 1.5. NDVI
+
+```{r}
+# Load MODIS NDVI (MOD13Q1, 250 m)
+ndvi <- ee$ImageCollection("MODIS/061/MOD13Q1")$
+  filterDate("2020-01-01", "2020-12-31")$  # adjust year if needed
+  select("NDVI")$
+  mean()  # average over the year
+
+# Clip to Mara
+ndvi_mara <- ndvi$clip(mara_geom)
+
+# Visualize NDVI
+ndvi_vis <- list(min = 0, max = 9000, palette = c("white","yellow","green"))
+
+
+Map$centerObject(mara_geom, zoom = 9)
+ndvi_map <- Map$addLayer(ndvi_mara, ndvi_vis, "NDVI")
+
+```
+
+
+
+```{r}
+
+# Convert your sf points to ee objects
+RandomPointsCD_ndvi <- sf_as_ee(RandomPointsCD_data)
+
+# Sample NDVI at points
+sampled_ndvi <- ndvi_mara$sampleRegions(
+  collection = RandomPointsCD_ndvi,
+  scale = 250,       # MODIS resolution
+  geometries = TRUE)
+
+# Bring to R
+sampled_ndvi_sf <- ee_as_sf(sampled_ndvi)
+View(sampled_ndvi_sf)
+
+RandomPointsCD_data <- sampled_ndvi_sf
+```
+
+
+
+### 1.5.1. Map
+
+```{r}
+
+CD_ndvi <- RandomPointsCD_data |>
+  filter(case == 1)
+
+CD_ndvi_map <- ndvi_map |>
+  # to save it with esri world imagery:
+  addProviderTiles(providers$Esri.WorldImagery) |>
+  
+  addCircleMarkers(
+    data = CD_ndvi, 
+    color = "red",
+    radius = 1,
+    fillOpacity = 0.9,
+    popup = ~paste("Clan:", clan, "<br>Year:", year))
+
+
+CD_ndvi_map
+
+```
+
+```{r}
+#save
+htmlwidgets::saveWidget(CD_ndvi_map, file = "Maps/CD_ndvi_map.html", selfcontained = TRUE)
+```
+
+
+## 1.6. Distance to water
+
 ```{r}
 
 ```
 
 
 
+## 1.7. Distance from edge of the territory
+
+
+```{r}
+
+```
 
 
 
+## 1.8. Month variable 
 
+I will use month as a proxy for season for den location, to test if the hyenas change their den location selection depending on season or not.
 
+```{r}
 
-
-
-
-
-
-
-
-
-
-
-
+```
 
 
 
