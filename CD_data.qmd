@@ -97,9 +97,15 @@ load_all_tables()
 
 ```
 
+```{r}
+write_csv2(tblSessions, "data_files/tblSessions.csv")
+write_csv2(tblLocationsPerSession, "data_files/tblLocationsPerSession.csv")
+```
+
+
 # 1. Create data
 
-## 1.1. Communal den dataframe
+## 1.1. Communal dens (CD) dataframe
 
 I will be using the tblLandmarks to identified CDs' locations (GPS points). Maybe also tblSessions/tblLocationsPerSession to ID sessions at communal dens and then have the location with the time/year.
 
@@ -144,6 +150,45 @@ CD_data <- merge(Sess_data, CD_SessLoc_data, by = "session")
 
 ```
 
+## 1.2. CD monthly
+
+I will use tblSessions to filter out the communal dens sessions and get the month and year of use of the different CD systems.
+
+```{r}
+
+# filtering out the right clans and sessions at a CD 
+CD_sess_data <- tblSessions |>
+  subset(str_detect(clan, "talek") | str_detect(clan, "serena") | str_detect(clan, "happy.zebra")) |>
+  mutate(clan = str_replace_all(clan, "\\.", "")) |>
+  filter(location == "d") |>
+  select(session, clan, location, date, hyenas)
+
+
+LocSess_CD_data <- tblLocationsPerSession |> 
+  filter(session %in% CD_sess_data$session) |>
+  select(session, landmark_id, utme, utmn)
+
+# there is a difference of ~7000 obs 
+# Those are all the sessions before 2000 that are not in the tblLocationsPerSession
+
+CD_LocSess_monthly_data <- merge(LocSess_CD_data, CD_sess_data, by = "session")
+
+```
+
+```{r}
+
+CD_monthly_data <- CD_LocSess_monthly_data |>
+  separate(date, c("year", "month", "day"), sep = "-", remove = F) |>
+  select(-day)
+
+```
+
+
+
+
+## 1.3. Filling utme/utmn
+
+### 1.3.1. Non monthly CD data
 Great, now I have all my Den sessions in Talek. I need to fill the utme and utmn columns so all of them of a specific locations. I can try to do that with my CD_loc_data database created earlier here.
 
 I want to match the landmark_id columns in both database and when it does, to add the utme and utmn values in the corresponding columns.
@@ -205,6 +250,18 @@ CD_for_map$year <- as.character(CD_for_map$year)
 str(CD_for_map)
 
 ```
+
+
+### 1.3.2. Monthly data
+
+I will just make fit landmark_id from the tblLandmark with the newly created CD_monthly_data.
+
+```{r}
+
+
+
+```
+
 
 
 

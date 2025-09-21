@@ -1232,10 +1232,61 @@ htmlwidgets::saveWidget(CD_ndvi_map, file = "Maps/CD_ndvi_map.html", selfcontain
 
 ## 1.6. Distance to water
 
-```{r}
+To get the distance to the closest water source, here are the steps we need to do :
+
+1. Identify water sources in the Masai Mara.
+2. Convert that into a raster mask (water = 1, non-water = 0).
+3. Compute distance to nearest water pixel.
+4. Sample that distance at your points.
+
+
+### 1.6.1. Identidy water source
+
+We will use the JRC Global Surface Water dataset. This makes polygons where there is water detected.
+
+```{r Water Source}
+# Load JRC Global Surface Water
+gsw <- ee$Image("JRC/GSW1_4/GlobalSurfaceWater")$select("occurrence")
+
+# Permanent water mask (>90% occurrence)
+water_mask <- gsw$gt(90)
+
+# Convert water pixels to vector polygons
+water_fc <- water_mask$reduceToVectors(
+  geometry = mara_geom,
+  geometryType = "polygon",
+  scale = 30,          # MODIS/SRTM resolution is fine
+  bestEffort = TRUE,
+  maxPixels = 1e13)
 
 ```
 
+```{r}
+# Visualize Masai Mara boundary
+Map$centerObject(mara_geom, zoom = 10)
+Map$addLayer(mara_fc, list(color = "blue"), "Masai Mara Boundary")
+
+# Add water polygons
+Map$addLayer(water_fc, list(color = "cyan"), "Water Polygons")
+```
+
+
+```{r}
+
+RandomPointsCD_water <- sf_as_ee(RandomPointsCD_data)
+
+sampled_dist_water <- dist_to_water$sampleRegions(
+  collection = RandomPointsCD_water,
+  scale = 10,       # match your land cover resolution
+  geometries = TRUE)
+
+sampled_dist_water_sf <- ee_as_sf(sampled_dist_water)
+View(sampled_dist_water_sf)
+
+
+RandomPointsCD_data <- sampled_dist_water_sf
+
+```
 
 
 ## 1.7. Distance from edge of the territory
