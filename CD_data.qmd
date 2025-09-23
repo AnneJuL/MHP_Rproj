@@ -98,8 +98,8 @@ load_all_tables()
 ```
 
 ```{r}
-write_csv2(tblSessions, "data_files/tblSessions.csv")
-write_csv2(tblLocationsPerSession, "data_files/tblLocationsPerSession.csv")
+#write_csv2(tblSessions, "data_files/tblSessions.csv")
+#write_csv2(tblLocationsPerSession, "data_files/tblLocationsPerSession.csv")
 ```
 
 
@@ -182,8 +182,10 @@ CD_LocSess_monthly_data <- merge(LocSess_CD_data, CD_sess_data, by = "session")
 CD_monthly_data <- CD_LocSess_monthly_data |>
   separate(date, c("year", "month", "day"), sep = "-", remove = F) |>
   select(-day) |>
-  mutate(landmark_id = str_replace_all(landmark_id, " ", "_"))
-
+  mutate(landmark_id = str_replace_all(landmark_id, " ", "_")) #|>
+  subset(str_detect(landmark_id, "den") | str_detect(landmark_id, "Den")) |>
+  select(-utme, -utmn) |>
+  distinct(landmark_id, year, month, .keep_all = TRUE)
 
 ```
 
@@ -269,17 +271,11 @@ Landmarks <- tblLandmarks |>
 
 ```
 
+
 ```{r}
-
-# First we need to turn the coordinates into numeric values
-
-CD_monthly_data$utme <- as.numeric(CD_monthly_data$utme)
-CD_monthly_data$utmn <- as.numeric(CD_monthly_data$utmn)
-
-
 #Just keeping the coordinates for the map
-CD_monthly_data_coord <- CD_monthly_data |>
-  select(utme, utmn, landmark_id, clan, year, month, session, hyenas) |>
+CD_monthly_data_clean <- CD_monthly_data |>
+  select(landmark_id, clan, year, month, session, hyenas) |>
   
   #changing talekw into talek
   mutate(clan = str_replace_all(clan, "talekw", "talek")) |>
@@ -297,6 +293,49 @@ CD_monthly_data_coord <- CD_monthly_data |>
     landmark_id == "Central_Park_CD2" ~ "Central_Park_Communal_Den",
     landmark_id == "Leopard_Sex_X" ~ "Leopard_Sex_Crossing",
     landmark_id == "Rbend_D" ~ "Riverbend_Den",
+    landmark_id == "Plant_D" ~ "Plantation_Den",
+    landmark_id == "K-6_Den" ~ "K6_Den",
+    landmark_id == "Albatross_Den_2" ~ "Albatross_Den",
+    landmark_id == "Pdise_D" ~ "Paradise_Den",
+    landmark_id == "Lala_D" ~ "Lala_Den",
+    landmark_id == "Roadside_D" ~ "Roadside_Den",
+    landmark_id == "Aardwolf_CD" ~ "Aardwolf_Communal_Den",
+    landmark_id == "Banana_T_D" ~ "Banana_Tree_Communal_Den",
+    landmark_id == "Alt_Aard_CD" ~ "Alternate_Aardvark_Communal_Den",
+    landmark_id == "Barbie_Party_D" ~ "Barbie_Party_Den",
+    landmark_id == "Base_D" ~ "Base_Natal_Den/Communal_Den",
+    landmark_id == "BLVD_D" ~ "Boulevard_Den",
+    landmark_id == "Cliff_D" ~ "Cliff_Den",
+    landmark_id == "Croc_C_D" ~ "Crocodile_Camp_Den",
+    landmark_id == "Crtn_Edge_CD" ~ "Croton_Edge_Communal_Den",
+    landmark_id == "Dave's_D" ~ "Dave_Den",
+    landmark_id == "Dave_D" ~ "Dave_Den",
+    landmark_id == "Demo_D" ~ "Democracy_Den",
+    landmark_id == "Dick_D" ~ "Dicks_Den",
+    landmark_id == "DOC_D" ~ "DOC_Communal_Den",
+    landmark_id == "DOC_D2" ~ "DOC_Den_2",
+    landmark_id == "Fever_T_ND/CD" ~ "Fever_Tree_Natal_Den/Communal_Den_Complex",
+    landmark_id == "Fever_T_ND/CD_Cplex" ~ "Fever_Tree_Natal_Den/Communal_Den_Complex",
+    landmark_id == "	
+near_Fever_T_ND/CD_Cplex_" ~ "Fever_Tree_Natal_Den/Communal_Den_Complex",
+    landmark_id == "Gardenia_D" ~ "Gardenia_Den",
+    landmark_id == "Green_D" ~ "Green_Den",
+    landmark_id == "Hday_CD" ~ "Holiday_Communal_Den",
+    landmark_id == "Hday_D" ~ "Holiday_Communal_Den",
+    landmark_id == "Milkyway_D" ~ "Milkyway_Den",
+    landmark_id == "Nomadic_D" ~ "Nomadic_Den",
+    landmark_id == "Olos_WB_ND/CD" ~ "Olosogon_Clearing_Communal_Den_Complex",
+    landmark_id == "Ranger_D" ~ "Ranger_Den",
+    landmark_id == "Res_D" ~ "Resurrection_Main_Den",
+    landmark_id == "Res_M_D" ~ "Resurrection_Main_Den",
+    landmark_id == "Shakespeare_D" ~ "Shakespeare_Den",
+    landmark_id == "Singizi_D" ~ "Singizi_Den",
+    landmark_id == "Sun_D" ~ "Sun_Den",
+    landmark_id == "Waverly_D" ~ "Waverly_Den",
+    landmark_id == "Wicked_D" ~ "Wicked_Den",
+    landmark_id == "Yoplait_D" ~ "Yoplait_Den",
+
+
 
     TRUE ~ landmark_id   # keep everything else unchanged
   )) |>
@@ -308,18 +347,22 @@ CD_monthly_data_coord <- CD_monthly_data |>
   filter(landmark_id != "KCM_D") |>
   filter(landmark_id != "~NA") |>
   filter(landmark_id != "Mteer_D" ) |> #Maybe 3 musketeer?? 
+  filter(landmark_id != "NCM_D")
 
-  # Filling up the NAs
-  left_join(Landmarks |>
-      select(landmark_id, utme_df2 = utme, utmn_df2 = utmn) |>
-      distinct(landmark_id, .keep_all = TRUE),
-    by = "landmark_id") |>
-  mutate(utme = ifelse(is.na(utme), utme_df2, utme), 
-         utmn = ifelse(is.na(utmn), utmn_df2, utmn)) |>
-  select(-utme_df2, -utmn_df2)
 
 
 ```
+
+
+
+
+Joining utme and utmn columns:
+```{r}
+CD_monthly_data_coord <- CD_monthly_data_clean |>
+left_join(Landmarks %>% select(landmark_id, utme, utmn),
+            by = "landmark_id", relationship = "many-to-many")
+```
+
 
 
 #### 1.3.2.1. Cleaning coordinates
@@ -336,57 +379,7 @@ CD_check_utmn <- CD_monthly_data_coord_clean |>
 ```{r}
 
 CD_monthly_data_coord_clean <- CD_monthly_data_coord |>
-  
 
-  left_join(CD_landmark_data |>
-      select(landmark_id, utme_df2 = utme, utmn_df2 = utmn) |>
-      distinct(landmark_id, .keep_all = TRUE),
-    by = "landmark_id") |>
-  
-  # fix utme/utmn when utmn is "1111111"  -- s21873
-  mutate(
-    utme = if_else(utme == "111111", utme_df2, utme),
-    utmn = if_else(utme == "111111", utmn_df2, utmn)) |>
-  
-   mutate(#s21873
-    utme = if_else(utmn == "1111111", utme_df2, utme),
-    utmn = if_else(utmn == "1111111", utmn_df2, utmn)) |>
-  
-  # fix utme/utmn when both are 0 for specific landmarks
-  mutate(
-    utme = if_else(
-      landmark_id %in% c("Twix_Den", "Precipice_Den_III") &
-        utme == 0 & utmn == 0,
-      utme_df2, utme),
-    utmn = if_else(
-      landmark_id %in% c("Twix_Den", "Precipice_Den_III") &
-        utme == 0 & utmn == 0,
-      utmn_df2, utmn)) |>
-  
-  # fix utme/utmn when both are 0 for specific landmarks
-  mutate(
-    utme = if_else(
-      landmark_id %in% c("Twix_Den", "Precipice_Den_III") & utmn == 0,
-      utme_df2, utme),
-    utmn = if_else(
-      landmark_id %in% c("Twix_Den", "Precipice_Den_III") & utmn == 0,
-      utmn_df2, utmn)) |>
-  
-  mutate(
-    utme = if_else(
-      landmark_id %in% c("Lugga_Den_III") & utme == 718731,
-      utme_df2, utme),
-    utmn = if_else(
-      landmark_id %in% c("Lugga_Den_III") & utme == 718731,
-      utmn_df2, utmn)) |>
-  
-  
-  # drop the helper columns
-  select(-utme_df2, -utmn_df2) |>
-  
-  
-  
-  
   # change the airstrip_den utme and utmn value with a comma
   mutate(
     utme = if_else(
@@ -397,35 +390,73 @@ CD_monthly_data_coord_clean <- CD_monthly_data_coord |>
       landmark_id == "Airstrip_Den",
       sub(".*,", "", as.character(utmn)),   # same for utmn
       as.character(utmn))) |>
-  
- # change the session t60813 and swap 4 and 7 in utme 
-  mutate(
-    utme = if_else(
-      landmark_id %in% c("Stupid_Tree", "Green_Den") & grepl("^47", utme),
-      sub("^47", "74", utme),
-      utme)) |>
-  
+
    # remove all that is after the coma for both utme and utmn
   mutate(
     across(
       c(utme, utmn),
       ~ if_else(
-        landmark_id %in% c("Box_Crossing"),
+        landmark_id %in% c("Green_Den", "Governor's_Camp", "Box_Crossing"),
         sub(",.*", "", .x),   # keep only before first comma
         .x))) |>
+  mutate(
+    across(
+      c(utme, utmn),
+      ~ if_else(
+        landmark_id %in% c("OK_Den"),
+        sub("^[^,]*,[^,]*,", "", .x),   # remove everything up to 2nd comma
+        .x))) |>
   
-   # Keep only before the comma 
+  # Keep only before the comma for utmn
   mutate(
     utmn = if_else(
-      landmark_id %in% c("Uproar_Den", "Three_Sisters"),  #t60159
-      sub(",.*", "", utmn),   # keep before the first comma
-      utmn))
-  
+      landmark_id %in% c("Uproar_Den", "Banana_Tree_Communal_Den", "Bloody_Awful_Den", "Three_Sisters"),
+      sub(",.*", "", utmn),
+      utmn)) |>
+  drop_na(utme)
+
+```
 
 
+```{r}
+
+CD_monthly_data_coord_clean <- CD_monthly_data_coord_clean |>
+  distinct(landmark_id, year, month, .keep_all = TRUE)
+```
 
 
+#### 1.3.2.2. Active CD
 
+Here I will find a way to filter out the active dens from the non active. 
+
+Using the hyenas ID, I want to identify the individuals that were cubs at a given year. Then, if they were cubs, I will consider the den as a communal den that year. So first, I want to create a dataframe with all individual IDs and their data of birth (DOB) including the year.
+
+Then, with the IDs and the year of birth, I will match the `hyenas` column from `CD_monthly_data` to the IDs in the new dataframe. If the ID is found in the hyena column, then it is a CD and we keep it.
+
+Creating the dataframe with IDs and DOB:
+```{r}
+
+DF_DOB <- tblLifeHistory |>
+  select(id, event_code, date) |>
+  filter(event_code == "DOB") |>
+  separate(date, c("year", "month", "day"), sep = "-", remove = F) |>
+  select(-day, -date, -event_code, -month) |>
+  drop_na(year) 
+
+```
+
+
+Now we match `DF_DOB` with the hyenas column in `CD_monthly_data_coord_clean`
+```{r}
+
+# Step 1: split hyena column into rows
+CD_monthly_data_IDs <- CD_monthly_data_coord_clean |>
+  separate_rows(hyenas, sep = ",")   # creates one row per id
+
+# Step 2: join with DF_DOB on id and year
+ActiveCD_data <- CD_monthly_data_IDs |>
+  inner_join(DF_DOB, by = c("hyenas" = "id", "year" = "year")) |>
+  distinct(year, landmark_id, month, session, utme, utmn, clan)
 
 ```
 
@@ -1032,6 +1063,43 @@ class(CD_sf$geometry[[2]]) # give : [1] "XY"    "POINT" "sfg"
 ```
 
 
+
+
+
+
+Monthly data:
+```{r}
+
+#Convert the dataframe into a sf object:
+CD_monthly_sf <- st_as_sf(CD_monthly_data_coord_clean, coords = c("utme", "utmn"), crs = 32736) #EPSG code is 32736, UTM Zone 36 South
+
+#outlier
+CD_monthly_sf <- CD_monthly_sf |>
+  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
+
+#Save the sf dataframe - can only do it once when it is not created before
+CD_monthly_sf <- sf::st_write(CD_monthly_sf, "data_files/CD_monthly_sf.shp", delete_dsn = TRUE)
+
+```
+
+```{r}
+#Convert the dataframe into a sf object:
+ActiveCD_sf <- st_as_sf(ActiveCD_data, coords = c("utme", "utmn"), crs = 32736) #EPSG code is 32736, UTM Zone 36 South
+
+#outlier
+ActiveCD_sf <- ActiveCD_sf |>
+  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
+
+#Save the sf dataframe - can only do it once when it is not created before
+ActiveCD_sf <- sf::st_write(ActiveCD_sf, "data_files/ActiveCD_sf.shp", delete_dsn = TRUE)
+
+
+```
+
+
+
+
+
 ## 2.3. WGS84 transform
 
 Also, to use leaflet (to make maps), we need to change the UTM coordinates into long lat : Here we transform the CD_sf into a WGS84 to use it with leaflet.
@@ -1065,6 +1133,35 @@ CD_sf_wgs84 <- CD_sf_wgs84 |>
 CD_sf_wgs84 <- sf::st_write(CD_sf_wgs84, "data_files/CD_sf_wgs84.shp", delete_dsn = TRUE)
 
 ```
+
+
+Monthly data:
+```{r}
+
+CD_monthly_wgs84 <- st_transform(CD_monthly_sf, crs = 4326)
+
+CD_monthly_wgs84 <- CD_monthly_wgs84 |>
+  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
+
+CD_monthly_wgs84 <- sf::st_write(CD_monthly_wgs84, "data_files/CD_monthly_wgs84.shp", delete_dsn = TRUE)
+
+```
+
+```{r}
+ActiveCD_wgs84 <- st_transform(ActiveCD_sf, crs = 4326)
+
+ActiveCD_wgs84 <- ActiveCD_wgs84 |>
+  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
+
+ActiveCD_wgs84 <- sf::st_write(ActiveCD_wgs84, "data_files/ActiveCD_wgs84.shp", delete_dsn = TRUE)
+
+```
+
+
+
+
+
+
 
 
 
@@ -1362,6 +1459,115 @@ htmlwidgets::saveWidget(AllGPS_location_perclan_mapleaflet, file = "Maps/AllGPS_
 ```
 
 
+### vi) Monthly CD
+
+```{r}
+
+pal <- colorFactor(palette = "viridis", domain = CD_monthly_wgs84$clan)
+
+CD_monthlyPerYear_mapleaflet <- leaflet() |>
+  addTiles()
+
+# Add points grouped by Year, colored by Clan
+years <- unique(CD_monthly_wgs84$year)
+
+for (yr in years) {
+  data_year <- CD_monthly_wgs84 |> filter(year == yr)
+  
+CD_monthlyPerYear_mapleaflet <- CD_monthlyPerYear_mapleaflet |>
+    addCircleMarkers(data = data_year,
+                     color = ~pal(clan),
+                     group = yr,
+                     radius = 3,
+                     fillOpacity = 0.8,
+                     popup = ~paste("Year:", year, "<br>", "Clan:", clan))
+}
+
+#Add toggle control for years
+CD_monthlyPerYear_mapleaflet <- CD_monthlyPerYear_mapleaflet |>
+  
+  addLayersControl(
+    baseGroups = years,
+    overlayGroups = c("Year"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) |>
+  
+  addScaleBar(position = "bottomleft", options = list(metric = TRUE, imperial = FALSE)) |>
+  
+  #Add a legend
+  addLegend("bottomright", pal = pal, values = CD_monthly_wgs84$clan,
+            title = "Clan", opacity = 1)
+  
+
+CD_monthlyPerYear_mapleaflet  # display the map
+
+
+```
+
+
+```{r}
+#save
+htmlwidgets::saveWidget(CD_monthlyPerYear_mapleaflet, file = "Maps/CD_monthlyPerYear_mapleaflet.html", selfcontained = TRUE)
+```
+
+
+with active CD dataframe:
+```{r}
+
+pal <- colorFactor(palette = "viridis", domain = ActiveCD_wgs84$clan)
+
+ActiveCD_monthlyPerYear_mapleaflet <- leaflet() |>
+  addTiles()
+
+# Add points grouped by Year, colored by Clan
+years <- unique(ActiveCD_wgs84$year)
+
+for (yr in years) {
+  data_year <- ActiveCD_wgs84 |> filter(year == yr)
+  
+ActiveCD_monthlyPerYear_mapleaflet <- ActiveCD_monthlyPerYear_mapleaflet |>
+    addCircleMarkers(data = data_year,
+                     color = ~pal(clan),
+                     group = yr,
+                     radius = 3,
+                     fillOpacity = 0.8,
+                     popup = ~paste("Year:", year, "<br>", "Clan:", clan))
+}
+
+#Add toggle control for years
+ActiveCD_monthlyPerYear_mapleaflet <- ActiveCD_monthlyPerYear_mapleaflet |>
+  
+  addLayersControl(
+    baseGroups = years,
+    overlayGroups = c("Year"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) |>
+  
+  addScaleBar(position = "bottomleft", options = list(metric = TRUE, imperial = FALSE)) |>
+  
+  #Add a legend
+  addLegend("bottomright", pal = pal, values = ActiveCD_wgs84$clan,
+            title = "Clan", opacity = 1)
+  
+
+ActiveCD_monthlyPerYear_mapleaflet  # display the map
+
+
+```
+
+
+```{r}
+#save
+htmlwidgets::saveWidget(ActiveCD_monthlyPerYear_mapleaflet, file = "Maps/ActiveCD_monthlyPerYear_mapleaflet.html", selfcontained = TRUE)
+```
+
+
+
+
+
+
+
+
 ## 3.2. Tables 
 
 ```{r}
@@ -1381,6 +1587,36 @@ save_as_html(CD_yearly_tab, path = "Tables/CD_yearly_tab.html")
 
 ```
 
+
+```{r}
+CD_monthly_data_coord_clean$year <- as.character(CD_monthly_data_coord_clean$year)
+
+CD_monthly_yearly <- CD_monthly_data_coord_clean |>
+  group_by(year, month, clan) |>
+  summarise(CD_num = n()) |>
+  arrange(year, month, clan)
+
+CD_monthly_yearly
+
+CD_monthly_yearly_tab <- flextable(CD_monthly_yearly)
+
+save_as_html(CD_monthly_yearly_tab, path = "Tables/CD_monthly_yearly_tab.html")
+```
+Ok, so here I have some >10 CD in 1 month during some years. After investigation, it looks like some "d" location in tblSessions are marked d but they don't seem to be active CD locations.
+
+So I have to find a way to distinct the active dens.
+
+
+```{r}
+ActiveCD_data$year <- as.character(ActiveCD_data$year)
+
+ActiveCD_data_tab <- ActiveCD_data |>
+  group_by(year, month, clan) |>
+  summarise(CD_num = n()) |>
+  arrange(year, month, clan)
+
+ActiveCD_data_tab
+```
 
 
 # 4. Prepare RSF data
