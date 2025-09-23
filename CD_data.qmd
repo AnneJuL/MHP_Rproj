@@ -265,9 +265,6 @@ I will just make fit landmark_id from the tblLandmarks with the newly created CD
 Landmarks <- tblLandmarks |>
   mutate(landmark_id = str_replace_all(landmark_id, " ", "_"))
 
-CD_landmark_data <- Landmarks |>
-  filter(landmark_id %in% CD_monthly_data$landmark_id)
-
 # now we fill the coordinates column:
 
 ```
@@ -286,9 +283,34 @@ CD_monthly_data_coord <- CD_monthly_data |>
   
   #changing talekw into talek
   mutate(clan = str_replace_all(clan, "talekw", "talek")) |>
+  
+  # change the non matching landmark_id names
+  mutate(landmark_id = case_when(
+    landmark_id == "Airstrip_D" ~ "Airstrip_Den",
+    landmark_id == "Maushugana_D_11" ~ "Mashugana_Den_II",
+    landmark_id == "Arba_Den" ~ "ARBA_Natal_Den",  
+    landmark_id == "upro_d" ~ "Uproar_Den",   
+    landmark_id == "Uproar_D" ~ "Uproar_Den", 
+    landmark_id == "Precipice_Den_3" ~ "Precipice_Den_III",
+    landmark_id == "Fever_T_ND/Cd_Cplx" ~ "Fever_Tree_Natal_Den/Communal_Den_Complex",
+    landmark_id == "Crtn_Edge_Den" ~ "Croton_Edge_Communal_Den",
+    landmark_id == "Central_Park_CD2" ~ "Central_Park_Communal_Den",
+    landmark_id == "Leopard_Sex_X" ~ "Leopard_Sex_Crossing",
+    landmark_id == "Rbend_D" ~ "Riverbend_Den",
+
+    TRUE ~ landmark_id   # keep everything else unchanged
+  )) |>
+
+ #getting rid of landmark that I have no idea what they are..
+  filter(landmark_id != "Martins_Den") |>
+  filter(landmark_id != "Kit_Kat_Den_2") |>
+  filter(landmark_id != "Pilot's_D") |>
+  filter(landmark_id != "KCM_D") |>
+  filter(landmark_id != "~NA") |>
+  filter(landmark_id != "Mteer_D" ) |> #Maybe 3 musketeer?? 
 
   # Filling up the NAs
-  left_join(CD_landmark_data |>
+  left_join(Landmarks |>
       select(landmark_id, utme_df2 = utme, utmn_df2 = utmn) |>
       distinct(landmark_id, .keep_all = TRUE),
     by = "landmark_id") |>
@@ -303,10 +325,10 @@ CD_monthly_data_coord <- CD_monthly_data |>
 #### 1.3.2.1. Cleaning coordinates
 
 ```{r}
-CD_check_utme <- CD_monthly_data_coord |>
+CD_check_utme <- CD_monthly_data_coord_clean |>
   filter(nchar(utme) != 6) # now it is 0
 
-CD_check_utmn <- CD_monthly_data_coord |>
+CD_check_utmn <- CD_monthly_data_coord_clean |>
   filter(nchar(utmn) != 7) # now is 0
 ```
 
@@ -315,6 +337,7 @@ CD_check_utmn <- CD_monthly_data_coord |>
 
 CD_monthly_data_coord_clean <- CD_monthly_data_coord |>
   
+
   left_join(CD_landmark_data |>
       select(landmark_id, utme_df2 = utme, utmn_df2 = utmn) |>
       distinct(landmark_id, .keep_all = TRUE),
@@ -340,32 +363,30 @@ CD_monthly_data_coord_clean <- CD_monthly_data_coord |>
         utme == 0 & utmn == 0,
       utmn_df2, utmn)) |>
   
-  # drop the helper columns
-  select(-utme_new, -utmn_new) #|>
+  # fix utme/utmn when both are 0 for specific landmarks
+  mutate(
+    utme = if_else(
+      landmark_id %in% c("Twix_Den", "Precipice_Den_III") & utmn == 0,
+      utme_df2, utme),
+    utmn = if_else(
+      landmark_id %in% c("Twix_Den", "Precipice_Den_III") & utmn == 0,
+      utmn_df2, utmn)) |>
   
-  # change 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  mutate(
+    utme = if_else(
+      landmark_id %in% c("Lugga_Den_III") & utme == 718731,
+      utme_df2, utme),
+    utmn = if_else(
+      landmark_id %in% c("Lugga_Den_III") & utme == 718731,
+      utmn_df2, utmn)) |>
+  
+  
+  # drop the helper columns
+  select(-utme_df2, -utmn_df2) |>
+  
+  
+  
+  
   # change the airstrip_den utme and utmn value with a comma
   mutate(
     utme = if_else(
@@ -377,119 +398,34 @@ CD_monthly_data_coord_clean <- CD_monthly_data_coord |>
       sub(".*,", "", as.character(utmn)),   # same for utmn
       as.character(utmn))) |>
   
- # change the session t99585 and t60813 and swap 4 and 7 in utme
+ # change the session t60813 and swap 4 and 7 in utme 
   mutate(
     utme = if_else(
       landmark_id %in% c("Stupid_Tree", "Green_Den") & grepl("^47", utme),
       sub("^47", "74", utme),
       utme)) |>
   
-  #same for session t116873, t116658 and t54139 (change 5 and 7)
-   mutate(
-    utme = if_else(
-      landmark_id %in% c("Croton_Island-East_Edge", "Cow_Tree", "Hi_Step_X") & grepl("^57", utme),
-      sub("^57", "75", utme),
-      utme)) |>
-
-  #remove the last digit of a 7 digit utme
-  mutate(
-  utme = if_else(
-    landmark_id %in% c("Big_Sky_Den", "The_Observatory", "BB_X") & nchar(utme) == 7,
-    substr(utme, 1, 6),   # keep only first 6 digits
-    utme)) |>
-  
-  #for session t117205, add a 4 after the first 7, and session t111704 add a 5 after the 7
-  mutate(
-    utme = if_else(
-      landmark_id == "Laura_Tree" & utme == "79731",
-      sub("^7", "74", utme),
-      utme)) |>
-  mutate(
-    utme = if_else(
-      landmark_id == "Sunshine_Tree" & utme == "70360",
-      sub("^7", "75", utme),
-      utme)) |>
-  
-  # remove the 2nd number 
-  mutate(
-  utme = if_else(
-    session %in% c("t112413", "t51456"),
-    paste0(substr(utme, 1, 1), substr(utme, 3, nchar(utme))),  # remove 2nd character
-    utme)) |>
-  
-  # remove all that is after the coma for both utme and utmn
+   # remove all that is after the coma for both utme and utmn
   mutate(
     across(
       c(utme, utmn),
       ~ if_else(
-        landmark_id %in% c("Serena_Lodge", "Box_Crossing", "Surprise_X"),
+        landmark_id %in% c("Box_Crossing"),
         sub(",.*", "", .x),   # keep only before first comma
         .x))) |>
   
-  # For this session "t49599" 
-  # 745095 8906 983
-  mutate(
-    utme = if_else(
-      session == "t49599",
-      substr(utme, 1, 6),   # keep only the first 6 characters
-      utme)) |>
+   # Keep only before the comma 
   mutate(
     utmn = if_else(
-      session == "t49599",
-      paste0("9806", utmn),   # add 9806 before in utmn
-      utmn)) |>
-  
-  # keep just after the 2nd comma (t22224)
-  mutate(
-    utme = if_else(
-      session == "t22224",
-      sub(".*?,.*?,", "", utme),   # keep everything after 2nd comma
-      utme),
-    utmn = if_else(
-      session == "t22224",
-      sub(".*?,.*?,", "", utmn),
-      utmn)) |>
-  
-  #Get rid of the last digit
-   mutate(
-    utme = if_else(
-      session %in% c("t47831", "t49436", "t48055", "t111641", "t72442", "t57018", "t120547", "t115642"),   # replace with your session IDs
-      substr(utme, 1, nchar(utme) - 1),  # drop last character
-      utme)) |>
-  
-  # Now these have only 5 digits in utme, i will just remove them
-  filter(!session %in% c("t115558", "t49400", "t66664", "t74990")) |> #I will see later if I decide to look for the last digit or not 
-  
-  #take out the sessions with weird utmn (99 and 0)
-  filter(session != "t99428") |>
-  filter(session != "t54706") |>
-  #take out the Low_Ranker's_Crossing cause utmn= utme
-  filter(landmark_id != "Low_Ranker's_Crossing") |>
-  
-  # Keep only before the comma 
-  mutate(
-    utmn = if_else(
-      landmark_id %in% c("Uproar_Den", "Fig_Tree_Lodge", "Virginia_Maria_Crossing", "Three_Sisters", "Green_Den"),  #t60159
+      landmark_id %in% c("Uproar_Den", "Three_Sisters"),  #t60159
       sub(",.*", "", utmn),   # keep before the first comma
-      utmn)) |>
-  
-  # Now keep all after the comma
-  mutate(
-    utmn = if_else(
-      landmark_id %in% c("Swakey_Tree"),
-      sub("^[^,]*,", "", utmn),   # remove everything up to the first comma
-      utmn)) |>
-  
-  # remove all utmn of 6 and 8
-  filter(nchar(utmn) != 6) |>
-  filter(nchar(utmn) != 8) |>
-
-  #change the utmn starting with 6 or 7 to 9
-  mutate(
-    utmn = if_else(
-      grepl("^[67]", utmn),   # starts with 6 or 7
-      sub("^[67]", "9", utmn),
       utmn))
+  
+
+
+
+
+
 
 ```
 
