@@ -432,9 +432,6 @@ We have a lot of covariables to create. Here is the list:
 
 -   Distance to water\*
 
--   Time of year ? 
-            --> I really want to find a way to get this...
-
 
 In more of a post-hoc thing: - Number of cubs at dens
 
@@ -914,8 +911,13 @@ MasaiMara_landcover_WC <- WorldCover$clip(mara_geom)
 
 # quick map to see (rgee interactive map):
 MasaiMara_landcover_map <- Map$addLayer(MasaiMara_landcover_WC, list(bands = "Map"), "WorldCover 10m (Map)")
+MasaiMara_landcover_map
 
+```
 
+```{r}
+# Save the map
+htmlwidgets::saveWidget(MasaiMara_landcover_map, file = "Maps/MasaiMara_landcover_map.html", selfcontained = TRUE)
 ```
 
 
@@ -930,7 +932,7 @@ RandomPointsCD_data_sampled <- MasaiMara_landcover_WC$sampleRegions(
   geometries = TRUE)
 
 # Bring only the sampled results to R (much smaller)
-RandomPointsCD_landcover <- ee_as_sf(RandomPointsCD_data_sampled)
+RandomPointsCD_landcover <- ee_as_sf(RandomPointsCD_data_sampled, maxFeatures = 20000)
 
 
 ```
@@ -946,7 +948,8 @@ RandomPointsCD_data <- RandomPointsCD_landcover |>
     `50` = "Built-up",
     `60` = "Bare",
     `80` = "Water",
-    `90` = "Wetland"))
+    `90` = "Wetland")) |>
+  select(-Map)
 
 ```
 
@@ -956,10 +959,10 @@ RandomPointsCD_data <- RandomPointsCD_landcover |>
 ```{r}
 # Color palette for land cover
 pal_lc <- colorFactor(palette = "Set2",  # or "viridis", or custom c("green","yellow",...)
-                      domain = RandomPointsCD_landcover$landcover)
+                      domain = RandomPointsCD_data$landcover)
 
 # keeping only the used points
-CD_landcover <- RandomPointsCD_landcover |>
+CD_landcover <- RandomPointsCD_data |>
   filter(case == 1)
 
 
@@ -1076,7 +1079,7 @@ save_as_html(landcover_tab_sum, path = "Tables/landcover_tab_sum.html")
 Save dataframe:
 ```{r}
 
-RandomPointsCD_landcover <- sf::st_write(RandomPointsCD_landcover, "data_files/RandomPointsCD_landcover.shp", delete_dsn = TRUE)
+RandomPointsCD_data <- sf::st_write(RandomPointsCD_data, "data_files/RandomPointsCD_data.shp", delete_dsn = TRUE)
 
 ```
 
@@ -1106,7 +1109,7 @@ sampled_elevation <- srtm_mara$sampleRegions(
   geometries = TRUE)
 
 # 4. Bring back to R
-sampled_elevation_sf <- ee_as_sf(sampled_elevation, maxFeatures = 5000)
+sampled_elevation_sf <- ee_as_sf(sampled_elevation, maxFeatures = 20000)
 
 # 5. Merge back into your dataframe
 RandomPointsCD_data <- sampled_elevation_sf
@@ -1127,8 +1130,14 @@ elev_vis <- list(
 Map$centerObject(mara_geom, zoom = 9)
 
 Elevation_map <- Map$addLayer(srtm_mara, elev_vis, "Elevation (m)")
-
+Elevation_map
 ```
+
+```{r}
+#save
+htmlwidgets::saveWidget(Elevation_map, file = "Maps/Elevation_map.html", selfcontained = TRUE)
+```
+
 
 ```{r}
 
@@ -1176,7 +1185,11 @@ ndvi_vis <- list(min = 0, max = 9000, palette = c("white","yellow","green"))
 
 Map$centerObject(mara_geom, zoom = 9)
 ndvi_map <- Map$addLayer(ndvi_mara, ndvi_vis, "NDVI")
+ndvi_map
+```
 
+```{r}
+htmlwidgets::saveWidget(ndvi_map, file = "Maps/ndvi_map.html", selfcontained = TRUE)
 ```
 
 
@@ -1193,8 +1206,7 @@ sampled_ndvi <- ndvi_mara$sampleRegions(
   geometries = TRUE)
 
 # Bring to R
-sampled_ndvi_sf <- ee_as_sf(sampled_ndvi)
-View(sampled_ndvi_sf)
+sampled_ndvi_sf <- ee_as_sf(sampled_ndvi, maxFeatures = 20000)
 
 RandomPointsCD_data <- sampled_ndvi_sf
 ```
@@ -1269,6 +1281,8 @@ Map$addLayer(mara_fc, list(color = "blue"), "Masai Mara Boundary")
 # Add water polygons
 Map$addLayer(water_fc, list(color = "cyan"), "Water Polygons")
 ```
+Now, this gives me only the Mara River, not the Talek river. I need to find a way to get all the water sources, maybe even seasonnally? Like every month of the year or something? and also identify the areas that are marsh and use it too.
+
 
 
 ```{r}
@@ -1298,13 +1312,6 @@ RandomPointsCD_data <- sampled_dist_water_sf
 
 
 
-## 1.8. Month variable 
-
-I will use month as a proxy for season for den location, to test if the hyenas change their den location selection depending on season or not.
-
-```{r}
-
-```
 
 
 

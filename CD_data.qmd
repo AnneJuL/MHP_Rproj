@@ -262,6 +262,8 @@ str(CD_for_map)
 
 I will just make fit landmark_id from the tblLandmarks with the newly created CD_monthly_data.
 
+I will use month as a proxy for season for den location, to test if the hyenas change their den location selection depending on season or not.
+
 ```{r}
 
 Landmarks <- tblLandmarks |>
