@@ -4,7 +4,6 @@ editor_options:
   chunk_output_type: console
 ---
 
-
 # Resource Selection Function - Drivers of communal den location
 
 # 0. Libraries et al.
@@ -95,37 +94,31 @@ CD_lions_wgs84 <- sf::st_read("data_files/CD_lions_wgs84.shp")
 RandomPointsCD_landcover <- sf::st_read("data_files/RandomPointsCD_landcover.shp")
 ```
 
-
 ```{r Files}
 CD_for_map <- readr::read_csv2("data_files/CD_for_map.csv")
 
 ```
 
-
 # 1. Modelling the RSF
 
 ALSO, we need to control for the obs effort (some years field team would go more on obs vs other years/season). I guess with year as a random, and month as a covariable, it does control for this...
 
-************
-7) Quick tips for RSF modelling
+------------------------------------------------------------------------
+
+7)  Quick tips for RSF modelling
 
 Treat landcover as a categorical predictor (factor) in your logistic/conditional logistic RSF (used vs available).
 
 If you used a very fine raster (10 m) but your hyena den location accuracy is coarse (GPS error), consider buffering points or using a majority focal window to reduce misclassification from single-pixel noise.
 
-If you want multi-year matching (landcover year of den use), pick the dataset year accordingly (Copernicus 2019 / WorldCover 2020 / MODIS yearly).
-************
-
-
-
-
+If you want multi-year matching (landcover year of den use), pick the dataset year accordingly (Copernicus 2019 / WorldCover 2020 / MODIS yearly). \*\*\*\*\*\*\*\*\*\*\*\*
 
 ## 1.1. RSF model
 
 I will separate the Talek points with the triangle ones, so that I can make a model with the Talek town borders as a variable.
 
-
 With brms:
+
 ```{r brms}
 
 brm_RSF <- brms::brm(case ~ landcover + (1|year) + (1|clan),
@@ -136,8 +129,6 @@ brm_RSF <- brms::brm(case ~ landcover + (1|year) + (1|clan),
 
 
 ```
-
-
 
 ## 1.2. Distance to Talek model
 
@@ -164,10 +155,4 @@ plot(conditional_effects(brm_RSF_tl), points = T)
 
 ```
 
-
-
 # 2. Lion RSF
-
-
-
-

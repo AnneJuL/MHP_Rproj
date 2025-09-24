@@ -2062,12 +2062,12 @@ Adding to the AllGPS
 CD_yearly_95MCPs_withRandom_mapleaflet <- leaflet() |> addTiles()
 
 pal2 <- colorFactor(palette = "viridis", domain = DB_AllGPS_sf_wgs84$clan)
-years2 <- unique(DB_AllGPS_sf_wgs84$year)
+years2 <- sort(unique(DB_AllGPS_sf_wgs84$year))
 
 
 for (yr in years2) {
   
-  points_year  <- CD_sf_wgs84 |> filter(year == yr)
+  points_year  <- ActiveCD_wgs84 |> filter(year == yr)
   mcp_year     <- mcp95_clan_year_sf |> filter(year == yr)
   random_year  <- RandomPointsCD_yearly_data |> filter(year == yr)
   
@@ -2077,7 +2077,8 @@ for (yr in years2) {
                      color = "red",
                      radius = 1,
                      fillOpacity = 0.6,
-                     popup = ~paste("Year:", year, "<br>", "Random point"),
+                     popup = ~paste("Year:", year, "<br>",
+                                    "Random point"),
                      group = paste0("Year ", yr))
   
   # 2. Used clan points (middle layer)
@@ -2088,7 +2089,8 @@ for (yr in years2) {
                      fillOpacity = 0.8,
                      popup = ~paste("Year:", year, "<br>",
                                     "Clan:", clan, "<br>", 
-                                    "Landmark:", landmark_id),
+                                    "Landmark:", landmark_id, "<br>",
+                                    "Month:", month),
                      group = paste0("Year ", yr))
   
   # 3. MCP polygons (top layer)
@@ -2110,7 +2112,7 @@ CD_yearly_95MCPs_withRandom_mapleaflet <- CD_yearly_95MCPs_withRandom_mapleaflet
     options = layersControlOptions(collapsed = FALSE)
   ) |>
   addScaleBar(position = "bottomleft", options = list(metric = TRUE, imperial = FALSE)) |>
-  addLegend("bottomright", pal = pal2, values = DB_AllGPS_sf_wgs84$clan,
+  addLegend("bottomright", pal = pal2, values = ActiveCD_wgs84$clan,
             title = "Clan", opacity = 1)
 
 CD_yearly_95MCPs_withRandom_mapleaflet
