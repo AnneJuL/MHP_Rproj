@@ -1212,6 +1212,12 @@ RandomPointsCD_data <- sampled_ndvi_sf
 ```
 
 
+```{r}
+RandomPointsCD_data <- sf::st_write(RandomPointsCD_data, "data_files/RandomPointsCD_data.shp", delete_dsn = TRUE)
+
+```
+
+
 
 ### 1.5.1. Map
 

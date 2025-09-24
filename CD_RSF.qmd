@@ -80,24 +80,14 @@ DB_AllGPS_sf <- sf::st_read("data_files/DB_AllGPS_sf.shp")
 DB_AllGPS_sf_wgs84 <- sf::st_read("data_files/DB_AllGPS_sf_wgs84.shp")
 
 
-
-# Communal den GPS points:
-CD_sf <- sf::st_read("data_files/CD_sf.shp")
-CD_sf_wgs84 <- sf::st_read("data_files/CD_sf_wgs84.shp")
-
-
 # Lions data
 CD_sf_lions <- sf::st_read("data_files/CD_sf_lions.shp")
 CD_lions_wgs84 <- sf::st_read("data_files/CD_lions_wgs84.shp")
 
 
-RandomPointsCD_landcover <- sf::st_read("data_files/RandomPointsCD_landcover.shp")
+RandomPointsCD_data <- sf::st_read("data_files/RandomPointsCD_data.shp")
 ```
 
-```{r Files}
-CD_for_map <- readr::read_csv2("data_files/CD_for_map.csv")
-
-```
 
 # 1. Modelling the RSF
 
@@ -107,11 +97,15 @@ ALSO, we need to control for the obs effort (some years field team would go more
 
 7)  Quick tips for RSF modelling
 
-Treat landcover as a categorical predictor (factor) in your logistic/conditional logistic RSF (used vs available).
+- Treat landcover as a categorical predictor (factor) in your logistic/conditional logistic RSF (used vs available).
 
-If you used a very fine raster (10 m) but your hyena den location accuracy is coarse (GPS error), consider buffering points or using a majority focal window to reduce misclassification from single-pixel noise.
+- If you used a very fine raster (10 m) but your hyena den location accuracy is coarse (GPS error), consider buffering points or using a majority focal window to reduce misclassification from single-pixel noise.
 
-If you want multi-year matching (landcover year of den use), pick the dataset year accordingly (Copernicus 2019 / WorldCover 2020 / MODIS yearly). \*\*\*\*\*\*\*\*\*\*\*\*
+- If you want multi-year matching (landcover year of den use), pick the dataset year accordingly (Copernicus 2019 / WorldCover 2020 / MODIS yearly).
+
+
+
+
 
 ## 1.1. RSF model
 
@@ -122,7 +116,7 @@ With brms:
 ```{r brms}
 
 brm_RSF <- brms::brm(case ~ landcover + (1|year) + (1|clan),
-                     data = RandomPointsCD_landcover, 
+                     data = RandomPointsCD_data, 
                      family = bernoulli(),
                      cores = 4, 
                      chains = 4)
@@ -130,10 +124,13 @@ brm_RSF <- brms::brm(case ~ landcover + (1|year) + (1|clan),
 
 ```
 
+
+
+
 ## 1.2. Distance to Talek model
 
 ```{r brms tlaek model}
-CD_RSF_data_tl <- CD_RSF_data |>
+CD_RSF_data_tl <- RandomPointsCD_data |>
   filter(clan == "talek")
 
 
