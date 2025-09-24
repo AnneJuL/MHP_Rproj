@@ -367,14 +367,6 @@ left_join(Landmarks %>% select(landmark_id, utme, utmn),
 
 #### 1.3.2.1. Cleaning coordinates
 
-```{r}
-CD_check_utme <- CD_monthly_data_coord_clean |>
-  filter(nchar(utme) != 6) # now it is 0
-
-CD_check_utmn <- CD_monthly_data_coord_clean |>
-  filter(nchar(utmn) != 7) # now is 0
-```
-
 
 ```{r}
 
@@ -416,6 +408,17 @@ CD_monthly_data_coord_clean <- CD_monthly_data_coord |>
   drop_na(utme)
 
 ```
+
+
+
+```{r}
+CD_check_utme <- CD_monthly_data_coord_clean |>
+  filter(nchar(utme) != 6) # now it is 0
+
+CD_check_utmn <- CD_monthly_data_coord_clean |>
+  filter(nchar(utmn) != 7) # now is 0
+```
+
 
 
 ```{r}
@@ -1511,6 +1514,8 @@ htmlwidgets::saveWidget(CD_monthlyPerYear_mapleaflet, file = "Maps/CD_monthlyPer
 ```
 
 
+
+### vii) Active CD
 with active CD dataframe:
 ```{r}
 
@@ -1570,6 +1575,10 @@ htmlwidgets::saveWidget(ActiveCD_monthlyPerYear_mapleaflet, file = "Maps/ActiveC
 
 ## 3.2. Tables 
 
+Calculate the sum of CD per year and clan.
+
+### i) CD_for_map
+
 ```{r}
 
 CD_for_map$year <- as.character(CD_for_map$year)
@@ -1587,6 +1596,8 @@ save_as_html(CD_yearly_tab, path = "Tables/CD_yearly_tab.html")
 
 ```
 
+
+### ii) CD_monthly_data_coord_clean
 
 ```{r}
 CD_monthly_data_coord_clean$year <- as.character(CD_monthly_data_coord_clean$year)
@@ -1607,6 +1618,8 @@ Ok, so here I have some >10 CD in 1 month during some years. After investigation
 So I have to find a way to distinct the active dens.
 
 
+
+### iii) ActiveCD_data
 ```{r}
 ActiveCD_data$year <- as.character(ActiveCD_data$year)
 
@@ -1629,6 +1642,8 @@ I need to determine how many points I want to sample for each points used. For e
 
 The `random_points()` function will create this `case\_` variable that will be use in the RSF later.
 
+
+
 ## 4.1. MCP by clans
 
 To make our RSF model, we need to create random points of potential locations of where the hyenas could have denned. To do that, we first need to know the extent of the clans' territory, and so we will calculate the MCP (Minimum Convex Polygon) for each clan. An MCP calculate the area that an animal uses. The MCP essentially draws a polygon around all the points where an animal has been observed.
@@ -1640,13 +1655,13 @@ Also, we are using the 95% MCP, so that it removes the 5% of outlier points.
 Here is the MCPs for all hyenas locations
 ```{r sp}
 # Convert all points to sp (adehabitatHR works with sp)
-CD_sp <- as(DB_AllGPS_sf_wgs84, "Spatial")
+AllGPS_sp <- as(DB_AllGPS_sf_wgs84, "Spatial")
 ```
 
 
 ```{r Clan 95 MCPs}
 # Create MCPs grouped by clan
-mcp95_clan <- mcp(CD_sp[, "clan"], percent = 95)
+mcp95_clan <- mcp(AllGPS_sp[, "clan"], percent = 95)
 
 # Convert back to sf
 mcp95_clan_sf <- st_as_sf(mcp95_clan)
@@ -1663,7 +1678,7 @@ mcp95_clan_sf <- mcp95_clan_sf |>
 ```{r Clans 100 MCP}
 
 # Create MCPs grouped by clan
-mcp100_clan <- mcp(CD_sp[, "clan"], percent = 100)
+mcp100_clan <- mcp(AllGPS_sp[, "clan"], percent = 100)
 
 # Convert back to sf
 mcp100_clan_sf <- st_as_sf(mcp100_clan)
@@ -1684,7 +1699,7 @@ Save
 ```{r Save}
 
 # Save the dataframe
-mcp95_clan_sf <- sf::st_write(mcp95_clan_sf, "data_files/mcp95_clan_sf.shp")
+mcp95_clan_sf <- sf::st_write(mcp95_clan_sf, "data_files/mcp95_clan_sf.shp", delete_dsn = TRUE)
 
 ```
 
@@ -1696,19 +1711,19 @@ Here is to make yearly MCPs per clans.
 ```{r Yearly 95% MCPs}
 
 # Create an ID that combines clan and year
-CD_sp$clan_year <- paste(CD_sp$clan, CD_sp$year, sep = "_")
+AllGPS_sp$clan_year <- paste(AllGPS_sp$clan, AllGPS_sp$year, sep = "_")
 
 # Count points per clan-year
-counts <- as.data.frame(table(CD_sp$clan_year))
+counts <- as.data.frame(table(AllGPS_sp$clan_year))
 
 # Keep only groups with >= 5 relocations
 valid_ids <- counts$Var1[counts$Freq >= 5]
 
 # Filter points
-CD_sp_valid <- CD_sp[CD_sp$clan_year %in% valid_ids, ]
+AllGPS_sp_valid <- AllGPS_sp[AllGPS_sp$clan_year %in% valid_ids, ]
 
 # Run MCP only on valid groups
-mcp95_clan_year <- mcp(CD_sp_valid[, "clan_year"], percent = 95)
+mcp95_clan_year <- mcp(AllGPS_sp_valid[, "clan_year"], percent = 95)
 mcp95_clan_year_sf <- st_as_sf(mcp95_clan_year)
 
 
@@ -1724,7 +1739,7 @@ mcp95_clan_year_sf <- mcp95_clan_year_sf |>
 ```{r Excluded vs included}
 
 # Count relocations per clan-year
-counts <- as.data.frame(table(CD_sp$clan_year)) |>
+counts <- as.data.frame(table(AllGPS_sp$clan_year)) |>
   rename(clan_year = Var1, n_points = Freq)
 
 # Split clan and year into separate columns
@@ -1755,7 +1770,7 @@ Save
 ```{r Save}
 
 #  Save the dataframe
-mcp95_clan_year_sf <- sf::st_write(mcp95_clan_year_sf, "data_files/mcp95_clan_year_sf.shp")
+mcp95_clan_year_sf <- sf::st_write(mcp95_clan_year_sf, "data_files/mcp95_clan_year_sf.shp", delete_dsn = T)
 
 ```
 
@@ -1863,11 +1878,12 @@ Great, now that we have our 95% MCPs based on all GPS points of the hyenas and t
 ```{r presence track}
 
 #Convert your sf object to a data frame with coordinates: 
-CD_sf_wgs84_df <- CD_sf_wgs84 |> 
+ActiveCD_wgs84_df <- ActiveCD_wgs84 |> 
   mutate(long = sf::st_coordinates(geometry)[,1], lat = sf::st_coordinates(geometry)[,2]) 
 
 #Change the CD_sf_wgs84_df into a track_xy object 
-presence_track <- make_track(CD_sf_wgs84_df, long, lat, crs = 4326, clan = clan, year = year, landmark_id = landmark_id)
+presence_track <- make_track(ActiveCD_wgs84_df, long, lat, crs = 4326, clan = clan, year = year, landmark_id = landmark_id, month = month, session = session)
+
 ```
 
 
@@ -1878,11 +1894,13 @@ This one is with the general MCP
 
 # Function to generate 10 random points per used
 generate_randoms <- function(pres_row, mcp_polygons, n = 10) {
-  clan_i <- pres_row$clan
-  year_i <- pres_row$year
+  clan_i        <- pres_row$clan
+  year_i        <- pres_row$year
+  month_i       <- pres_row$month
+  session_i     <- pres_row$session
   landmark_id_i <- pres_row$landmark_id
   
-  mcp_i <- mcp_polygons %>% filter(clan == clan_i, year == year_i)
+  mcp_i <- mcp_polygons %>% filter(clan == clan_i)
   
   if (nrow(mcp_i) == 0) return(NULL)
   
@@ -1893,6 +1911,8 @@ generate_randoms <- function(pres_row, mcp_polygons, n = 10) {
     geometry = rand_geom,
     clan = clan_i,
     year = year_i,
+    month = month_i,
+    session = session_i,
     landmark_id = landmark_id_i,
     case_ = 0,
     crs = st_crs(mcp_polygons)
@@ -1906,12 +1926,12 @@ mcp95_clan_sf <- mcp95_clan_sf |>
 
 RandomPointsCD_data <- map_dfr(
   1:nrow(presence_track),
-  ~ generate_randoms(presence_track[.x, ], mcp95_clan_year_sf, n = 10))
+  ~ generate_randoms(presence_track[.x, ], mcp95_clan_sf, n = 10))
 
 # Combine used and random points
 RandomPointsCD_data <- bind_rows(
   presence_track |>
-    st_as_sf(coords = c("x_", "y_"), crs = st_crs(mcp95_clan_sf)) |>
+    select(-x_, -y_) |>
     mutate(case_ = 1),
   RandomPointsCD_data)
 
@@ -1923,7 +1943,7 @@ RandomPointsCD_data <- RandomPointsCD_data |>
 
 Save
 ```{r Save}
-RandomPointsCD_data <- sf::st_write(RandomPointsCD_data, "data_files/RandomPointsCD_data.shp")
+RandomPointsCD_data <- sf::st_write(RandomPointsCD_data, "data_files/RandomPointsCD_data.shp", delete_dsn = T)
 ```
 
 
@@ -1935,6 +1955,8 @@ generate_randoms <- function(pres_row, mcp_polygons, n = 10) {
   # Extract identifiers from the presence row
   clan_i       <- pres_row$clan
   year_i       <- pres_row$year
+  month_i      <- pres_row$month
+  session_i    <- pres_row$session
   landmark_id_i <- pres_row$landmark_id
   
   # Subset to the MCP polygon for the *same clan and year*
@@ -1951,6 +1973,8 @@ generate_randoms <- function(pres_row, mcp_polygons, n = 10) {
   rand_sf <- st_sf(
     clan        = clan_i,
     year        = year_i,
+    month       = month_i,
+    session     = session_i,
     landmark_id = landmark_id_i,
     case_       = 0,                 # available points
     geometry    = rand_geom,
@@ -1972,7 +1996,7 @@ RandomPointsCD_yearly_data <- map_dfr(
 # Combine used and random points
 RandomPointsCD_yearly_data <- bind_rows(
   presence_track |>
-    st_as_sf(coords = c("x_", "y_"), crs = st_crs(mcp95_clan_year_sf)) |>
+    select(-x_, -y_) |>
     mutate(case_ = 1),
   RandomPointsCD_yearly_data)
 
@@ -1986,7 +2010,7 @@ RandomPointsCD_yearly_data <- RandomPointsCD_yearly_data |>
 
 ```{r Save}
 
-RandomPointsCD_yearly_data <- sf::st_write(RandomPointsCD_yearly_data, "data_files/RandomPointsCD_year_data.shp")
+RandomPointsCD_yearly_data <- sf::st_write(RandomPointsCD_yearly_data, "data_files/RandomPointsCD_year_data.shp", delete_dsn = T)
 
 ```
 
