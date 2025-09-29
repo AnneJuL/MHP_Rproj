@@ -81,6 +81,8 @@ RandomPointsCD_year_data <- sf::st_read("data_files/RandomPointsCD_year_data.shp
 
 ```
 
+
+
 # 1. Installing rgee
 
 I will use rgee package to get different spatial covariables : 
@@ -887,7 +889,7 @@ RandomPointsCD_year_data$dst_tl <- as.numeric(st_distance(RandomPointsCD_year_da
 
 
 
-## 1.3. Land cover
+## 1.3. Land cover (rgee)
 
 I will use the package rgee (Google Earth Engine for R), which was installed in section 1.
 
@@ -1083,9 +1085,140 @@ RandomPointsCD_data <- sf::st_write(RandomPointsCD_data, "data_files/RandomPoint
 
 ```
 
+## 1.4. Land cover (LULC)
+
+Now we will use the landcover raster from Spagnuolo et al. 2018. It has way more precise categories of land cover by using multi-date radar and optical imagery in a highly accurate way. More importantly, it was validated with field observations.
+
+```{r}
+# Load your raster land cover from LULC (ZL file)
+Mara_LULC <- terra::rast("Mara_LULC/Mara_LULC_2018.tif")
+
+# Check it
+Mara_LULC
+
+plot(Mara_LULC, col = terrain.colors(20))
+```
 
 
-## 1.4. Elevation
+### 1.4.1. Extract land cover
+
+We want to extract the land cover for my specific CD and ramdom points created.
+To do this we will use the raster directly, so first we need to transfer my dataframe of Random/used points into a vector (terra format) and then extract the land cover respective to each location.
+
+```{r}
+# Convert sf → SpatVector (terra format)
+RandomPointsCD_vect <- vect(RandomPointsCD_year_data)
+
+# Extract land cover values at each point
+RandomPointsCD_year_data$landcover <- terra::extract(Mara_LULC, RandomPointsCD_vect)[,2]
+```
+
+Now we change the code to what it is:
+
+The type_id translates to land cover class as follows (classes defined in Table 1 of the attached paper):
+
+type_id 2 = Barren
+type_id 5 = Riverine forest
+type_id 6 = Upland forest
+type_id 7 = Grass Acacia
+type_id 8 = Grass Balanites
+type_id 10 = Tall grass
+type_id 11 = Medium grass
+type_id 13 = Short grass
+type_id 14 = Shrub
+type_id 17 = Water
+type_id 18 = Emergent wetland
+type_id 20 = Wet meadow
+
+
+```{r}
+RandomPointsCD_data <- RandomPointsCD_year_data |>
+  mutate(landcover = dplyr::recode(landcover,
+    `2` = "Barren",
+    `5` = "Riverine_forest",
+    `6` = "Upland_forest",
+    `7` = "Grass_Acaciad",
+    `8` = "Grass_Balanites",
+    `10` = "Tall_grass",
+    `11` = "Medium_grass",
+    `13` = "Short_grass",
+    `14` = "Shrub",
+    `17` = "Water", 
+    `18` = "Emergent_wetland", 
+    `20` = "Wet_meadow"))
+```
+
+### 1.4.2. Map
+
+```{r}
+# Reproject to WGS84 (Leaflet needs EPSG:4326)
+Mara_LULC_wgs84 <- project(Mara_LULC, "EPSG:4326")
+
+Mara_LULC_wgs84_small <- terra::aggregate(Mara_LULC_wgs84, fact = 20)
+
+
+```
+
+
+
+```{r}
+
+# Create color palette:
+pal_LULC <- colorNumeric(palette = terrain.colors(20), 
+                    domain = values(Mara_LULC_wgs84), 
+                    na.color = "transparent")
+
+
+Mara_LULC_CD_leaflet <- leaflet() |>
+  addTiles() |>
+  addRasterImage(Mara_LULC_wgs84_small, colors = pal_LULC, opacity = 0.6) |>
+  addCircleMarkers(data = CD_landcover,
+                   radius = 2, stroke = FALSE, fillOpacity = 0.9,
+                   popup = ~paste("Clan:", clan, "<br>", 
+                                  "LC:", landcover, "<br>",
+                                  "Landmark:", lndmrk_))  |>
+  addLegend(pal = pal_LULC, values = values(Mara_LULC_wgs84_small),
+            title = "Landcover", position = "bottomright")
+
+Mara_LULC_CD_leaflet
+
+```
+
+```{r}
+#save
+htmlwidgets::saveWidget(Mara_LULC_CD_leaflet, file = "Maps/Mara_LULC_CD_leaflet.html", selfcontained = TRUE)
+```
+
+
+```{r}
+
+Mara_LULC_CDRandom_leaflet <- leaflet() |>
+  addTiles() |>
+  addRasterImage(Mara_LULC_wgs84_small, colors = pal_LULC, opacity = 0.6) |>
+  addCircleMarkers(data = RandomPointsCD_data,
+                   color = ~ifelse(case=="1", "red", "blue"),
+                   radius = 2, stroke = FALSE, fillOpacity = 0.9,
+                   popup = ~paste("Clan:", clan, "<br>", 
+                                  "LC:", landcover, "<br>",
+                                  "Landmark:", lndmrk_))  |>
+  addLegend(pal = pal_LULC, values = values(Mara_LULC_wgs84_small),
+            title = "Landcover", position = "bottomright")
+
+Mara_LULC_CDRandom_leaflet
+```
+
+```{r}
+#save
+htmlwidgets::saveWidget(Mara_LULC_CDRandom_leaflet, file = "Maps/Mara_LULC_CDRandom_leaflet.html", selfcontained = TRUE)
+```
+
+
+
+
+
+
+
+## 1.5. Elevation
 
 We will use the rgee package again to extrat elevation of the Masai Mara. The dataset is SRTM Digital Elevation (30 m). 
 
@@ -1117,7 +1250,7 @@ RandomPointsCD_data <- sampled_elevation_sf
 ```
 
 
-### 1.4.1. Map 
+### 1.5.1. Map 
 
 ```{r}
 
@@ -1167,7 +1300,7 @@ htmlwidgets::saveWidget(CD_elevation_map, file = "Maps/CD_elevation_map.html", s
 
 
 
-## 1.5. NDVI
+## 1.6. NDVI
 
 ```{r}
 # Load MODIS NDVI (MOD13Q1, 250 m)
@@ -1219,7 +1352,7 @@ RandomPointsCD_data <- sf::st_write(RandomPointsCD_data, "data_files/RandomPoint
 
 
 
-### 1.5.1. Map
+### 1.6.1. Map
 
 ```{r}
 
@@ -1248,7 +1381,7 @@ htmlwidgets::saveWidget(CD_ndvi_map, file = "Maps/CD_ndvi_map.html", selfcontain
 ```
 
 
-## 1.6. Distance to water
+## 1.7. Distance to water
 
 To get the distance to the closest water source, here are the steps we need to do :
 
@@ -1258,7 +1391,7 @@ To get the distance to the closest water source, here are the steps we need to d
 4. Sample that distance at your points.
 
 
-### 1.6.1. Identidy water source
+### 1.7.1. Identidy water source
 
 We will use the JRC Global Surface Water dataset. This makes polygons where there is water detected.
 
@@ -1309,7 +1442,15 @@ RandomPointsCD_data <- sampled_dist_water_sf
 ```
 
 
-## 1.7. Distance from edge of the territory
+### 1.7.2. USING LULC
+
+
+
+
+
+
+
+## 1.8. Distance from edge of the territory
 
 
 ```{r}

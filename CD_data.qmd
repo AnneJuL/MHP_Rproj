@@ -39,7 +39,7 @@ library(hyenadata) # MHP hyena data
 library(tidyr) # # for data manip
 library(ggplot2) # data visualization and graphs
 library(stringr) 
-library(lubridate) # to create my year column and month one
+library(lubridate) # to play with date columns
 library(ggspatial) # to make easy maps with ggplot
 library(basemaps) # for basemap function 
 library(tidyverse)
@@ -434,34 +434,79 @@ CD_monthly_data_coord_clean <- CD_monthly_data_coord_clean |>
 
 Here I will find a way to filter out the active dens from the non active. 
 
-Using the hyenas ID, I want to identify the individuals that were cubs at a given year. Then, if they were cubs, I will consider the den as a communal den that year. So first, I want to create a dataframe with all individual IDs and their data of birth (DOB) including the year.
+Using the hyenas ID, I want to identify the individuals that were cubs at a given year. Then, if they were cubs and seen at a den, I will consider the den as a communal den that year. So first, I want to create a dataframe with all individual IDs and their data of birth (DOB) including the year.
 
 Then, with the IDs and the year of birth, I will match the `hyenas` column from `CD_monthly_data` to the IDs in the new dataframe. If the ID is found in the hyena column, then it is a CD and we keep it.
 
-Creating the dataframe with IDs and DOB:
+Creating the dataframe with IDs, DOB (Date of birth) and DOG (Date of graduation:
 ```{r}
 
-DF_DOB <- tblLifeHistory |>
+tblLifeHistory2 <- tblLifeHistory |>
+  mutate(date = as.character(date),
+         date = ifelse(id == "bard" & event_code == "DenGrad", "2018-02-20", date), 
+         date = ifelse(id == "lgnd" & event_code == "DenGrad", "2017-01-19", date),
+         date = as.Date(date))
+
+DF_DOB_DOG <- tblLifeHistory2 |>
   select(id, event_code, date) |>
-  filter(event_code == "DOB") |>
-  separate(date, c("year", "month", "day"), sep = "-", remove = F) |>
-  select(-day, -date, -event_code, -month) |>
-  drop_na(year) 
+  filter(event_code == "DOB" | event_code == "DenGrad") |>
+  mutate(DOB = if_else(event_code == "DOB", as.character(date), NA)) |>
+  mutate(DOG = if_else(event_code == "DenGrad", as.character(date), NA)) |>
+  separate(DOB, c("year_DOB", "month_DOB", "day_DOB"), sep = "-", remove = F) |>
+  drop_na(date) |>
+  select(-event_code, -date) |>
+  group_by(id) |>
+  summarise(across(everything(), ~ first(na.omit(.x))), .groups = "drop")
+
+DF_DOB_DOG$DOG <- as.Date(DF_DOB_DOG$DOG)
+DF_DOB_DOG$DOB <- as.Date(DF_DOB_DOG$DOB)
+
+
+# Adding the months that each hyena was a considered a cub (before 1yo where we consider them fully graduated)
+DF_DOB_DOG_comp <- DF_DOB_DOG |>
+  mutate(DOG = ifelse(is.na(DOG), DOB + years(1), DOG),
+         DOG = as.Date(DOG)) |> # to make sure to keep it in yy-mm-dd
+  separate(DOG, c("year_DOG", "month_DOG", "day_DOG"), sep = "-", remove = F) |>
+  select(-day_DOB, -day_DOG) |>
+  drop_na(DOB)
+
+# Here I will create the dataframe to use in the next step after, which is ids of cubs for the whole 12 months they were considered cubs at CD
+DF_month_at_CD <- DF_DOB_DOG_comp |>
+  mutate(month_seq = map2(DOB, DOG, ~ seq(from = floor_date(.x, "month"),
+                                          to   = floor_date(.y, "month"),
+                                          by   = "1 month"))) |>
+  unnest(month_seq) |>
+  mutate(month_at_CD = format(month_seq, "%Y-%m")) |>
+  select(-month_seq) # drop helper column
+
 
 ```
 
 
 Now we match `DF_DOB` with the hyenas column in `CD_monthly_data_coord_clean`
 ```{r}
-
-# Step 1: split hyena column into rows
+# Split hyena column into rows
 CD_monthly_data_IDs <- CD_monthly_data_coord_clean |>
   separate_rows(hyenas, sep = ",")   # creates one row per id
+```
 
-# Step 2: join with DF_DOB on id and year
+
+```{r}
+# Join with DF_DOB on id and year
 ActiveCD_data <- CD_monthly_data_IDs |>
-  inner_join(DF_DOB, by = c("hyenas" = "id", "year" = "year")) |>
+  mutate(yy_mm = paste0(year, "-", month)) |>
+  inner_join(DF_month_at_CD, by = c("hyenas" = "id", "yy_mm" = "month_at_CD")) |>
   distinct(year, landmark_id, month, session, utme, utmn, clan)
+
+# Here I have 466 unique landmarks
+```
+
+
+##### i) Active CD per year
+
+```{r}
+ActiveCD_data_year <- ActiveCD_data |>
+  distinct(landmark_id, year, .keep_all = T)
 
 ```
 
@@ -1007,7 +1052,9 @@ You can also create and sf object with st_sf, where you will have a sfc object s
 ```{r Save}
 
 write_csv2(CD_for_map, "data_files/CD_for_map.csv")
+write_csv2(ActiveCD_data, "data_files/ActiveCD_data.csv")
 write_csv2(DB_AllGPS, "data_files/DB_AllGPS.csv")
+write_csv2(ActiveCD_data_year, "data_files/ActiveCD_data_year.csv")
 
 ```
 
@@ -1101,6 +1148,19 @@ ActiveCD_sf <- sf::st_write(ActiveCD_sf, "data_files/ActiveCD_sf.shp", delete_ds
 
 ```
 
+```{r}
+#Convert the dataframe into a sf object:
+ActiveCD_year_sf <- st_as_sf(ActiveCD_data_year, coords = c("utme", "utmn"), crs = 32736) #EPSG code is 32736, UTM Zone 36 South
+
+#outlier
+ActiveCD_year_sf <- ActiveCD_year_sf |>
+  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
+
+#Save the sf dataframe - can only do it once when it is not created before
+ActiveCD_year_sf <- sf::st_write(ActiveCD_year_sf, "data_files/ActiveCD_year_sf.shp", delete_dsn = TRUE)
+
+```
+
 
 
 
@@ -1161,11 +1221,6 @@ ActiveCD_wgs84 <- ActiveCD_wgs84 |>
 ActiveCD_wgs84 <- sf::st_write(ActiveCD_wgs84, "data_files/ActiveCD_wgs84.shp", delete_dsn = TRUE)
 
 ```
-
-
-
-
-
 
 
 
@@ -1878,14 +1933,12 @@ htmlwidgets::saveWidget(AllGPS_yearly_95MCPs_mapleaflet, file = "Maps/AllGPS_yea
 Great, now that we have our 95% MCPs based on all GPS points of the hyenas and the GPS locations of the communal dens, we can proceed to generate random points and put all that in a dataframe that will be use in our RSF (See covariables quarto to see all the covariables added to that dataframe).
 
 ```{r presence track}
-
 #Convert your sf object to a data frame with coordinates: 
 ActiveCD_wgs84_df <- ActiveCD_wgs84 |> 
   mutate(long = sf::st_coordinates(geometry)[,1], lat = sf::st_coordinates(geometry)[,2]) 
 
 #Change the CD_sf_wgs84_df into a track_xy object 
 presence_track <- make_track(ActiveCD_wgs84_df, long, lat, crs = 4326, clan = clan, year = year, landmark_id = landmark_id, month = month, session = session)
-
 ```
 
 
