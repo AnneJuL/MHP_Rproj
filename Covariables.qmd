@@ -1461,6 +1461,11 @@ RandomPointsCD_data <- sampled_dist_water_sf
 
 
 
+## 1.9. Distance to roads
+
+```{r}
+
+```
 
 
 
