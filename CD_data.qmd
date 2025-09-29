@@ -2162,6 +2162,8 @@ for (yr in years2) {
 
 # Add controls + legend
 CD_yearly_95MCPs_withRandom_mapleaflet <- CD_yearly_95MCPs_withRandom_mapleaflet |>
+  addProviderTiles(providers$Esri.WorldImagery) |>
+
   addLayersControl(
     baseGroups = paste0("Year ", years2),
     options = layersControlOptions(collapsed = FALSE)
