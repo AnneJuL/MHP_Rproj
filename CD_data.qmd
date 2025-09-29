@@ -277,7 +277,7 @@ Landmarks <- tblLandmarks |>
 ```{r}
 #Just keeping the coordinates for the map
 CD_monthly_data_clean <- CD_monthly_data |>
-  select(landmark_id, clan, year, month, session, hyenas) |>
+  select(landmark_id, clan, year, month, date, session, hyenas) |>
   
   #changing talekw into talek
   mutate(clan = str_replace_all(clan, "talekw", "talek")) |>
@@ -424,8 +424,8 @@ CD_check_utmn <- CD_monthly_data_coord_clean |>
 
 
 ```{r}
-
-CD_monthly_data_coord_clean <- CD_monthly_data_coord_clean |>
+CD_monthly_data_coord_distinct <- CD_monthly_data_coord_clean |>
+  select(-date) |>
   distinct(landmark_id, year, month, .keep_all = TRUE)
 ```
 
@@ -486,13 +486,13 @@ DF_month_at_CD <- DF_DOB_DOG_comp |>
 Now we match `DF_DOB` with the hyenas column in `CD_monthly_data_coord_clean`
 ```{r}
 # Split hyena column into rows
-CD_monthly_data_IDs <- CD_monthly_data_coord_clean |>
+CD_monthly_data_IDs <- CD_monthly_data_coord_distinct |>
   separate_rows(hyenas, sep = ",")   # creates one row per id
 ```
 
 
 ```{r}
-# Join with DF_DOB on id and year
+# Join with DF_month_at_CD on id and year
 ActiveCD_data <- CD_monthly_data_IDs |>
   mutate(yy_mm = paste0(year, "-", month)) |>
   inner_join(DF_month_at_CD, by = c("hyenas" = "id", "yy_mm" = "month_at_CD")) |>
@@ -502,12 +502,30 @@ ActiveCD_data <- CD_monthly_data_IDs |>
 ```
 
 
-##### i) Active CD per year
+##### i) Active CD distinct per year
 
 ```{r}
 ActiveCD_data_year <- ActiveCD_data |>
   distinct(landmark_id, year, .keep_all = T)
 
+```
+
+##### ii) Active CD for all session 
+
+```{r}
+# Split hyena column into rows
+CD_AllSess_data_IDs <- CD_monthly_data_coord_clean |>
+  separate_rows(hyenas, sep = ",")   # creates one row per id
+```
+
+```{r}
+# Join with DF_month_at_CD on id and year
+ActiveCD_AllSess <- CD_AllSess_data_IDs |>
+  mutate(yy_mm = paste0(year, "-", month)) |>
+  inner_join(DF_month_at_CD, by = c("hyenas" = "id", "yy_mm" = "month_at_CD")) |>
+  distinct(year, month, date, landmark_id, session, utme, utmn, clan)
+
+  
 ```
 
 
@@ -1055,6 +1073,9 @@ write_csv2(CD_for_map, "data_files/CD_for_map.csv")
 write_csv2(ActiveCD_data, "data_files/ActiveCD_data.csv")
 write_csv2(DB_AllGPS, "data_files/DB_AllGPS.csv")
 write_csv2(ActiveCD_data_year, "data_files/ActiveCD_data_year.csv")
+write_csv2(CD_monthly_data_coord_clean, "data_files/CD_monthly_data_coord_clean.csv")
+
+write_csv2(ActiveCD_AllSess, "data_files/ActiveCD_AllSess.csv")
 
 ```
 
@@ -1162,6 +1183,19 @@ ActiveCD_year_sf <- sf::st_write(ActiveCD_year_sf, "data_files/ActiveCD_year_sf.
 ```
 
 
+```{r}
+#Convert the dataframe into a sf object:
+ActiveCD_AllSess_sf <- st_as_sf(ActiveCD_AllSess, coords = c("utme", "utmn"), crs = 32736) #EPSG code is 32736, UTM Zone 36 South
+
+#outlier
+ActiveCD_AllSess_sf <- ActiveCD_AllSess_sf |>
+  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
+
+#Save the sf dataframe - can only do it once when it is not created before
+ActiveCD_AllSess_sf <- sf::st_write(ActiveCD_AllSess_sf, "data_files/ActiveCD_AllSess_sf.shp", delete_dsn = TRUE)
+```
+
+
 
 
 
@@ -1222,6 +1256,17 @@ ActiveCD_wgs84 <- sf::st_write(ActiveCD_wgs84, "data_files/ActiveCD_wgs84.shp", 
 
 ```
 
+```{r}
+
+ActiveCD_AllSess_wgs84 <- st_transform(ActiveCD_AllSess_sf, crs = 4326)
+
+ActiveCD_AllSess_wgs84 <- ActiveCD_AllSess_wgs84 |>
+  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
+
+ActiveCD_AllSess_wgs84 <- sf::st_write(ActiveCD_AllSess_wgs84, "data_files/ActiveCD_AllSess_wgs84.shp", delete_dsn = TRUE)
+
+
+```
 
 
 
