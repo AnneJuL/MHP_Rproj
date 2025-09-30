@@ -507,7 +507,6 @@ ActiveCD_data <- CD_monthly_data_IDs |>
 ```{r}
 ActiveCD_data_year <- ActiveCD_data |>
   distinct(landmark_id, year, .keep_all = T)
-
 ```
 
 ##### ii) Active CD for all session 
