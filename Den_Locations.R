@@ -3,6 +3,7 @@ library(dplyr)
 library(ggplot2)
 library(sf)
 library(janitor)
+library(leaflet)
 
 data_all <- list.files(path = "E:\\MHP\\Data\\MHP\\ActiveCD_data",
                        pattern = "*.csv", full.names = TRUE)
@@ -17,6 +18,13 @@ den_data <- read_delim("E:\\MHP\\Data\\MHP\\ActiveCD_data.csv")
 
 # Inspect structure
 str(den_data)
+den_data <- filter(den_data,utmn<9859000)
+
+den_data <- den_data %>%
+  mutate(clan = case_when(
+    clan %in% c("talek,", "talek") ~ "talek",
+    TRUE ~ clan
+  ))
 den_data <- den_data %>%
   janitor::clean_names() %>%    # standardizes names (lowercase, no spaces)
   mutate(
@@ -24,13 +32,15 @@ den_data <- den_data %>%
     utmn  = as.numeric(gsub(",", "", utmn)),
     year  = as.integer(year),
     month = as.factor(month),
-    clan  = as.factor(clan)     # will now work
+    clan  = as.factor(clan) 
   )
 
 den_summary <- den_data %>%
   group_by(landmark_id, utme, utmn, clan) %>%
   summarise(total_sessions = n(), .groups = "drop")
 
+
+clean_names()
 ggplot(den_summary, aes(x = utme, y = utmn, 
                         size = total_sessions, 
                         color = clan)) +
@@ -41,3 +51,4 @@ ggplot(den_summary, aes(x = utme, y = utmn,
        x = "Easting (UTM)", 
        y = "Northing (UTM)",
        size = "Total Sessions")
+
