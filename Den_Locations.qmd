@@ -6,8 +6,8 @@ editor_options:
 
 # Den Locations - Fiona's script
 
-
 ## 0. Libraries
+
 ```{r}
 library(readr)
 library(dplyr)
@@ -17,17 +17,15 @@ library(janitor)
 library(leaflet)
 ```
 
+## 1. Import Data
 
-## 1. Import Ddta
+data_all \<- list.files(path = "E:\\MHP\\Data\\MHP\\ActiveCD_data", pattern = "\*.csv", full.names = TRUE) colnames(den_data)
 
-```{r}
-data_all <- list.files(path = "E:\\MHP\\Data\\MHP\\ActiveCD_data",
-                       pattern = "*.csv", full.names = TRUE)
-colnames(den_data)
-
-df <- readr::read_csv2("E:\\MHP\\Data\\MHP\\ActiveCD_data.csv")
+df \<- readr::read_csv2("E:\\MHP\\Data\\MHP\\ActiveCD_data.csv")
 
 head(df)
+
+```{r}
 
 
 den_data <- read_delim("E:\\MHP\\Data\\MHP\\ActiveCD_data.csv")
@@ -56,11 +54,10 @@ den_summary <- den_data %>%
   summarise(total_sessions = n(), .groups = "drop")
 ```
 
-
-
 ## 2. Map
+
 ```{r}
-clean_names()
+#clean_names()
 ggplot(den_summary, aes(x = utme, y = utmn, 
                         size = total_sessions, 
                         color = clan)) +
@@ -74,9 +71,3 @@ ggplot(den_summary, aes(x = utme, y = utmn,
 
 
 ```
-
-
-
-
-
-
