@@ -27,7 +27,6 @@ head(df)
 
 ```{r}
 
-
 den_data <- read_delim("E:\\MHP\\Data\\MHP\\ActiveCD_data.csv")
 
 # Inspect structure
