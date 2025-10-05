@@ -7,7 +7,7 @@ library(leaflet)
 
 data_all <- list.files(path = "E:\\MHP\\Data\\MHP\\ActiveCD_data",
                        pattern = "*.csv", full.names = TRUE)
-colnames(den_data)
+
 
 df <- readr::read_csv2("E:\\MHP\\Data\\MHP\\ActiveCD_data.csv")
 

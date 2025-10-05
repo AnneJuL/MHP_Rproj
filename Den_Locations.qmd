@@ -39,6 +39,7 @@ den_data <- read_delim("data_files/ActiveCD_data.csv")
 str(den_data)
 den_data <- filter(den_data,utmn<9859000)
 
+# Remove duplicate names
 den_data <- den_data %>%
   mutate(clan = case_when(
     clan %in% c("talek,", "talek") ~ "talek",
@@ -111,18 +112,32 @@ CD_landcover_map <- ggplot()+
   #landcover map
   geom_raster(data=Mara_LULC_df, aes(x=x, y=y, fill = landcover))+
   coord_fixed()+
-  scale_fill_viridis_c()+
+  tidyterra::scale_fill_terrain_c()+
   
   #CD plot
   geom_point(data=den_summary, aes(x = utme, y = utmn, 
                         size = total_sessions, 
                         color = clan),alpha = 0.7) +
-  coord_equal() +
-  theme_minimal() +
-  labs(title = "Hyena Den Activity",
-       x = "Easting (UTM)", 
-       y = "Northing (UTM)",
-       size = "Total Sessions")
+  scale_color_manual(
+    name = "Clan",
+    values = c(
+      "happyzebra" = "#e41a1c",  # bright red
+      "serenan"    = "#377eb8",  # deep blue
+      "serenas"    = "#4daf4a",  # green
+      "talek"      = "#984ea3"   # purple
+    )
+  ) +
+  scale_size_continuous(name = "Total Sessions") +
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "Hyena Den Activity",
+    x = "Easting (UTM)",
+    y = "Northing (UTM)"
+  ) +
+  theme(
+    legend.position = "right",
+    panel.grid = element_blank()
+  )
 
 CD_landcover_map
 
