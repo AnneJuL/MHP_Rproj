@@ -1737,7 +1737,7 @@ ActiveCD_data_tab
 ActiveCD_data_year <- readr::read_csv2("data_files/ActiveCD_data_year.csv")
 
 ActiveCD_unique_tab <- ActiveCD_data_year |>
-  distinct(landmark_id, utme, utmn)
+  distinct(landmark_id, utme, utmn, clan)
 
 write_csv2(ActiveCD_unique_tab, "Tables/ActiveCD_unique_tab.csv")
 
