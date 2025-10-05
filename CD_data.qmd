@@ -1732,6 +1732,19 @@ ActiveCD_data_tab <- ActiveCD_data |>
 ActiveCD_data_tab
 ```
 
+```{r}
+
+ActiveCD_data_year <- readr::read_csv2("data_files/ActiveCD_data_year.csv")
+
+ActiveCD_unique_tab <- ActiveCD_data_year |>
+  distinct(landmark_id, utme, utmn)
+
+write_csv2(ActiveCD_unique_tab, "Tables/ActiveCD_unique_tab.csv")
+
+
+```
+
+
 
 # 4. Prepare RSF data
 
