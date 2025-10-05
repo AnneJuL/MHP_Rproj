@@ -9,30 +9,31 @@ editor_options:
 ## 0. Libraries
 
 ```{r}
+
+install.packages("terra")
+
 library(readr)
 library(dplyr)
 library(ggplot2)
 library(sf)
 library(janitor)
 library(leaflet)
+library(terra) # to upload raster data
+library(tidyterra)
 ```
 
 ## 1. Import Data
 
-data_all \<- list.files(path = "E:\\MHP\\Data\\MHP\\ActiveCD_data", pattern = "\*.csv", full.names = TRUE) colnames(den_data)
-
-df \<- readr::read_csv2("E:\\MHP\\Data\\MHP\\ActiveCD_data.csv")
-
-head(df)
 
 ```{r}
 
-den_data <- read_delim("E:\\MHP\\Data\\MHP\\ActiveCD_data.csv")
+den_data <- read_delim("data_files/ActiveCD_data.csv")
 
 # Inspect structure
 str(den_data)
 den_data <- filter(den_data,utmn<9859000)
 
+# Remove duplicate names
 den_data <- den_data %>%
   mutate(clan = case_when(
     clan %in% c("talek,", "talek") ~ "talek",
@@ -55,8 +56,33 @@ den_summary <- den_data %>%
 
 ## 2. Map
 
+
+Uploading landcover grassland raster.
 ```{r}
-#clean_names()
+Mara_LULC <- terra::rast("Mara_LULC/Mara_LULC_2018.tif")
+```
+
+
+```{r}
+
+Mara_LULC_df <- as.data.frame(Mara_LULC, xy = TRUE)
+
+Mara_LULC_df <- Mara_LULC_df |>
+  rename(landcover = Mara_LULC_2018)
+
+
+landcover_map <- ggplot(Mara_LULC_df, aes(x, y, fill = landcover))+
+  geom_raster()+
+  coord_fixed()+
+  tidyterra::scale_fill_terrain_c()
+
+landcover_map
+```
+
+
+```{r}
+
+CD_plot <-
 ggplot(den_summary, aes(x = utme, y = utmn, 
                         size = total_sessions, 
                         color = clan)) +
@@ -68,5 +94,50 @@ ggplot(den_summary, aes(x = utme, y = utmn,
        y = "Northing (UTM)",
        size = "Total Sessions")
 
+CD_plot
 
 ```
+
+
+Put lancover map in background:
+```{r}
+
+CD_landcover_map <- ggplot()+
+  #landcover map
+  geom_raster(data=Mara_LULC_df, aes(x=x, y=y, fill = landcover))+
+  coord_fixed()+
+  tidyterra::scale_fill_terrain_c()+
+  
+  #CD plot
+  geom_point(data=den_summary, aes(x = utme, y = utmn, 
+                        size = total_sessions, 
+                        color = clan),alpha = 0.7) +
+  scale_color_manual(
+    name = "Clan",
+    values = c(
+      "happyzebra" = "#e41a1c",  # bright red
+      "serenan"    = "#377eb8",  # deep blue
+      "serenas"    = "#4daf4a",  # green
+      "talek"      = "#984ea3"   # purple
+    )
+  ) +
+  scale_size_continuous(name = "Total Sessions") +
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "Hyena Den Activity",
+    x = "Easting (UTM)",
+    y = "Northing (UTM)"
+  ) +
+  theme(
+    legend.position = "right",
+    panel.grid = element_blank()
+  )
+
+CD_landcover_map
+
+```
+
+
+
+
+
