@@ -100,6 +100,8 @@ load_all_tables()
 ```{r}
 #write_csv2(tblSessions, "data_files/tblSessions.csv")
 #write_csv2(tblLocationsPerSession, "data_files/tblLocationsPerSession.csv")
+
+write_csv2(tblLifeHistory.wide, "data_files/tblLifeHistory.wide.csv")
 ```
 
 
