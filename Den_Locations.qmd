@@ -168,8 +168,11 @@ write_csv(den_latlon_df, "Tables/ActiveCD_unique_tab_latlon.csv")
 ```
 
 
+## Cub data
 ```{r}
 
+#import cub data
+CD_AllSess_data_IDs <- read_csv2("data_files/CD_AllSess_data_IDs.csv")
 ```
 
 
