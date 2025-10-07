@@ -1075,6 +1075,7 @@ write_csv2(ActiveCD_data_year, "data_files/ActiveCD_data_year.csv")
 write_csv2(CD_monthly_data_coord_clean, "data_files/CD_monthly_data_coord_clean.csv")
 
 write_csv2(ActiveCD_AllSess, "data_files/ActiveCD_AllSess.csv")
+write_csv2(CD_AllSess_data_IDs, "data_files/CD_AllSess_data_IDs.csv")
 
 ```
 
@@ -1099,9 +1100,7 @@ DB_AllGPS_sf <- sf::st_write(DB_AllGPS_sf, "data_files/DB_AllGPS_sf.shp", delete
 
 
 
-
-
-THis is with only the den locations:
+This is with only the den locations:
 ```{r shp in UTM}
 # Turning the points into coordinates to put in a map
 
@@ -1194,6 +1193,10 @@ ActiveCD_AllSess_sf <- ActiveCD_AllSess_sf |>
 ActiveCD_AllSess_sf <- sf::st_write(ActiveCD_AllSess_sf, "data_files/ActiveCD_AllSess_sf.shp", delete_dsn = TRUE)
 ```
 
+```{r}
+ActiveCD_AllSess_sf <- sf::st_read("data_files/ActiveCD_AllSess_sf.shp")
+
+```
 
 
 
