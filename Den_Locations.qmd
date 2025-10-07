@@ -137,6 +137,41 @@ CD_landcover_map
 
 ```
 
+#change to lat/long
+```{r}
+library(readr)
+library(sf)
+library(dplyr)
+
+# 1. Read the CSV
+den_data <- read_delim("Tables/ActiveCD_unique_tab.csv")
+
+# 2. Convert to spatial object (using your UTM columns)
+den_sf <- st_as_sf(den_data, coords = c("utme", "utmn"), crs = 32736)  # 32736 = UTM Zone 36N
+
+# 3. Transform to WGS84 (lat/long)
+den_latlon <- st_transform(den_sf, crs = 4326)
+
+# 4. Extract coordinates and combine with original data
+den_latlon_df <- cbind(den_data, st_coordinates(den_latlon))
+
+# 5. Save to CSV
+write_csv(den_latlon_df, "Tables/ActiveCD_unique_tab_latlon.csv")
+
+# 6. Optional: Check
+View(den_latlon_df)
+
+## Save to csv
+write_csv(den_latlon_df, "Tables/ActiveCD_unique_tab_latlon.csv")
+
+
+```
+
+
+```{r}
+
+```
+
 
 
 
