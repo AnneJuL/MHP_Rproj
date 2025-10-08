@@ -4,9 +4,13 @@ editor_options:
   chunk_output_type: console
 ---
 
+
+
 # Den Locations - Fiona's script
 
 ## 0. Libraries
+
+
 
 ```{r}
 
@@ -22,7 +26,11 @@ library(terra) # to upload raster data
 library(tidyterra)
 ```
 
+
+
 ## 1. Import Data
+
+
 
 
 ```{r}
@@ -54,14 +62,17 @@ den_summary <- den_data %>%
   summarise(total_sessions = n(), .groups = "drop")
 ```
 
+
+
 ## 2. Map
 
 
 Uploading landcover grassland raster.
+
+
 ```{r}
 Mara_LULC <- terra::rast("Mara_LULC/Mara_LULC_2018.tif")
 ```
-
 
 ```{r}
 
@@ -78,7 +89,6 @@ landcover_map <- ggplot(Mara_LULC_df, aes(x, y, fill = landcover))+
 
 landcover_map
 ```
-
 
 ```{r}
 
@@ -99,7 +109,11 @@ CD_plot
 ```
 
 
+
+
 Put lancover map in background:
+
+
 ```{r}
 
 CD_landcover_map <- ggplot()+
@@ -135,10 +149,13 @@ CD_landcover_map <- ggplot()+
 
 CD_landcover_map
 
-
 ```
 
+
+
 ## change to lat/long
+
+
 ```{r}
 library(readr)
 library(sf)
@@ -169,7 +186,11 @@ write_csv(den_latlon_df, "Tables/ActiveCD_unique_tab_latlon.csv")
 ```
 
 
+
+
 ## Cub data
+
+
 ```{r}
 
 #import cub data
@@ -177,7 +198,11 @@ CD_AllSess_data_IDs <- read_csv2("data_files/CD_AllSess_data_IDs.csv")
 ```
 
 
+
+
 ## Load tables
+
+
 ```{r}
 
 library(hyenadata) # MHP hyena data
@@ -191,7 +216,11 @@ load_all_tables <- function(){
 load_all_tables()
 ```
 
+
+
 ## Combine tables for cub capacity of den
+
+
 ```{r}
 
 #1. Select IDs and Date of birth (DOB) from tblLifeHistory.wide
@@ -242,7 +271,6 @@ CD_AllSess_data_IDs_cub <- CD_AllSess_data_IDs_age %>%
     cub = ifelse(age <= 365, "yes", "no")
   )
 
-
 table(CD_AllSess_data_IDs$cub)
 
 # 6. Total number of cubs per den
@@ -251,114 +279,21 @@ cubs_per_den <- CD_AllSess_data_IDs_cub %>%
   summarize(
     total_cubs = sum(cub == "yes", na.rm =T),   # total cub sessions 
     ) %>%
-  arrange(desc(total_cubs))
-cubs_active <- cubs_per_den %>%
-  filter(total_cubs > 0)# sort by most active dens
+  arrange(desc(total_cubs))                # sort by most active dens
 
 View(cubs_per_den)
-
-## Filter active dens
-
-cubs_active <- cubs_per_den %>%
-  filter(total_cubs > 0)
-
-## Remove duplicate coordinates and landmarkid
-den_coords <- CD_AllSess_data_IDs %>%
-  group_by(landmark_id) %>%
-  summarise(
-    utme = mean(utme, na.rm = TRUE),
-    utmn = mean(utmn, na.rm = TRUE)
-  )
-
-cubs_map <- cubs_map %>%
-  left_join(
-    CD_AllSess_data_IDs %>% select(landmark_id, clan) %>% distinct(),
-    by = "landmark_id"
-  )
-
-names(cubs_map)
-cubs_map <- filter(cubs_map,utmn<9850000)
 
 ```
 
 ```{r}
 ## plot
-ggplot(cubs_map, aes(x = utme, y = utmn)) +
-  geom_point(aes(size = total_cubs, color = clan), alpha = 0.7) +
-  scale_size_continuous(range = c(3, 10)) +
-  labs(
-    title = "Active Hyena Dens by Number of Cubs",
-    x = "UTM Easting",
-    y = "UTM Northing",
-    size = "Total Cubs",
-    color = "Clan"
-  ) +
-  theme_minimal()
-
-```
-
-
-## Maximum cubs at den
-```{r}
-# 1 Select the den with the highest cub count per landmark_id
-cubs_highest <- cubs_per_den |>
-  group_by(landmark_id) |>
-  slice_max(order_by = total_cubs, n = 1, with_ties = FALSE) %>%
-  ungroup()
-
-# 2 Add clan information
-cubs_highest <- cubs_highest |>
-  left_join(
-    CD_AllSess_data_IDs |>
-      select(landmark_id, clan) |>
-      distinct(),
-    by = "landmark_id"
-  )
-
-# 3??? Sort dens from highest to lowest cub numbers
-cubs_highest <- cubs_highest |>
-  arrange(desc(total_cubs))
-
-# 4??? View the top dens
-View(cubs_highest)
-
-## Plot
-
-library(dplyr)
 library(ggplot2)
 
-# Summarize total cubs per clan
-cubs_by_clan <- cubs_highest %>%
-  group_by(clan) %>%
-  summarise(total_cubs = sum(total_cubs, na.rm = TRUE)) %>%
-  arrange(desc(total_cubs))
-
-# Plot horizontally
-library(dplyr)
-library(ggplot2)
-
-# Summarize total cubs per den
-cubs_by_den <- cubs_highest %>%
-  group_by(landmark_id, clan) %>%
-  summarise(total_cubs = sum(total_cubs, na.rm = TRUE), .groups = "drop") %>%
-  arrange(desc(total_cubs))
-
-# Optional: keep only dens with at least one cub
-cubs_by_den <- cubs_by_den %>% filter(total_cubs > 0)
-
-# Plot horizontally (by den, colored by clan)
-ggplot(cubs_by_den, aes(x = reorder(landmark_id, total_cubs),
-                        y = total_cubs,
-                        fill = clan)) +
+ggplot(cubs_per_den, aes(x = reorder(landmark_id, -total_cubs), y = total_cubs, fill = clan)) +
   geom_col() +
   coord_flip() +
-  theme(axis.text.y = element_blank(),
-        axis.ticks.y = element_blank())+
-  labs(
-    title = "Total Cubs per Den (by Clan)",
-    x = "Den names",
-    y = "Total Cubs")
-
+  labs(title = "Total Cubs per Den", x = "Den (Landmark ID)", y = "Total Cubs") +
+  theme_minimal()
 
 ```
 
