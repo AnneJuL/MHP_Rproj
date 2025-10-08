@@ -982,8 +982,7 @@ lion_sized_mapleaflet <- CD_peryear_mapleaflet |>
 lion_sized_mapleaflet
 ```
 
-## Random points for year of creation of the communal dens : 
-
+## Random points for year of creation of the communal dens :
 
 ```{r presence track}
 
@@ -995,8 +994,8 @@ CD_sf_wgs84_df <- CD_sf_wgs84 |>
 presence_track <- make_track(CD_sf_wgs84_df, long, lat, crs = 4326, clan = clan, year = year, landmark_id = landmark_id)
 ```
 
-
 ### 4.2.1. General MCP
+
 This one is with the general MCP
 
 ```{r 10 random per used}
@@ -1047,13 +1046,15 @@ RandomPointsCD_data <- RandomPointsCD_data |>
 ```
 
 Save
+
 ```{r Save}
 RandomPointsCD_data <- sf::st_write(RandomPointsCD_data, "data_files/RandomPointsCD_data.shp")
 ```
 
-
 ### 4.2.2. Yearly MCPs
+
 Now this one is with the yearly MCP
+
 ```{r}
 # Function to generate random points per presence row
 generate_randoms <- function(pres_row, mcp_polygons, n = 10) {
@@ -1115,12 +1116,10 @@ RandomPointsCD_yearly_data <- sf::st_write(RandomPointsCD_yearly_data, "data_fil
 
 ```
 
-
-
-
 ### 4.2.3. Plots
 
 Using the yearly data points:
+
 ```{r}
 
 RandomPointsCD_mapleaflet <- leaflet() |> 
@@ -1147,15 +1146,14 @@ RandomPointsCD_mapleaflet
 
 ```
 
-
 ```{r}
 # Save the map
 htmlwidgets::saveWidget(RandomPointsCD_mapleaflet, file = "Maps/RandomPointsCD_mapleaflet.html", selfcontained = TRUE)
 
 ```
 
-
 Adding to the AllGPS
+
 ```{r}
 
 # Adding the random point in the AllGPS_yearly_95MCPs_mapleaflet
@@ -1218,7 +1216,6 @@ CD_yearly_95MCPs_withRandom_mapleaflet
 
 ```
 
-
 ```{r}
 # Save the map
 htmlwidgets::saveWidget(CD_yearly_95MCPs_withRandom_mapleaflet, file = "Maps/CD_yearly_95MCPs_withRandom_mapleaflet.html", selfcontained = TRUE)
@@ -1227,50 +1224,233 @@ htmlwidgets::saveWidget(CD_yearly_95MCPs_withRandom_mapleaflet, file = "Maps/CD_
 
 
 
+### 1.4.1. tblLifeHistory - NOT USE ANYMORE
+
+Then, with the IDs and the year of birth, I will match the `id` column from `CD_monthly_data` to the IDs in the new dataframe. If the ID is found in the hyena column, then it is a CD and we keep it.
+
+
+Creating the dataframe with IDs, DOB (Date of birth) and DOG (Date of graduation:
+```{r}
+
+tblLifeHistory2 <- tblLifeHistory |>
+  mutate(date = as.character(date),
+         date = ifelse(id == "bard" & event_code == "DenGrad", "2018-02-20", date), 
+         date = ifelse(id == "lgnd" & event_code == "DenGrad", "2017-01-19", date),
+         date = as.Date(date))
+
+DF_DOB_DOG <- tblLifeHistory2 |>
+  select(id, event_code, date) |>
+  filter(event_code == "DOB" | event_code == "DenGrad") |>
+  mutate(DOB = if_else(event_code == "DOB", as.character(date), NA)) |>
+  mutate(DOG = if_else(event_code == "DenGrad", as.character(date), NA)) |>
+  separate(DOB, c("year_DOB", "month_DOB", "day_DOB"), sep = "-", remove = F) |>
+  drop_na(date) |>
+  select(-event_code, -date) |>
+  group_by(id) |>
+  summarise(across(everything(), ~ first(na.omit(.x))), .groups = "drop")
+
+DF_DOB_DOG$DOG <- as.Date(DF_DOB_DOG$DOG)
+DF_DOB_DOG$DOB <- as.Date(DF_DOB_DOG$DOB)
+
+
+# Adding the months that each hyena was a considered a cub (before 1yo where we consider them fully graduated)
+DF_DOB_DOG_comp <- DF_DOB_DOG |>
+  mutate(DOG = ifelse(is.na(DOG), DOB + years(1), DOG),
+         DOG = as.Date(DOG)) |> # to make sure to keep it in yy-mm-dd
+  separate(DOG, c("year_DOG", "month_DOG", "day_DOG"), sep = "-", remove = F) |>
+  select(-day_DOB, -day_DOG) |>
+  drop_na(DOB)
+
+# Here I will create the dataframe to use in the next step after, which is ids of cubs for the whole 12 months they were considered cubs at CD
+DF_month_at_CD <- DF_DOB_DOG_comp |>
+  mutate(month_seq = map2(DOB, DOG, ~ seq(from = floor_date(.x, "month"),
+                                          to   = floor_date(.y, "month"),
+                                          by   = "1 month"))) |>
+  unnest(month_seq) |>
+  mutate(month_at_CD = format(month_seq, "%Y-%m")) |>
+  select(-month_seq) # drop helper column
+
+
+```
+
+
+Now we match `DF_DOB` with the hyenas column in `CD_monthly_data_coord_clean`
+```{r}
+# Split hyena column into rows
+#CD_monthly_data_IDs <- CD_monthly_data_coord_distinct |>
+  #separate_rows(hyenas, sep = ",")   # creates one row per id
+```
+
+
+```{r}
+# Join with DF_month_at_CD on id and year
+ActiveCD_data <- CD_monthly_data_IDs |>
+  mutate(yy_mm = paste0(year, "-", month)) |>
+  inner_join(DF_month_at_CD, by = c("hyenas" = "id", "yy_mm" = "month_at_CD")) |>
+  distinct(year, landmark_id, month, session, utme, utmn, clan)
+
+# Here I have 466 unique landmarks
+```
 
 
 
+### 1.3.1. Non monthly CD data
+Great, now I have all my Den sessions in Talek. I need to fill the utme and utmn columns so all of them of a specific locations. I can try to do that with my CD_loc_data database created earlier here.
+
+I want to match the landmark_id columns in both database and when it does, to add the utme and utmn values in the corresponding columns.
+
+```{r Full DB}
+
+CD_sess_data <- CD_data |>
+  select(-c(3:5, 7:11))
+
+# merge the utme and utmn columns
+CD_data_full <- merge(CD_sess_data, CD_loc_data, by = "landmark_id")
+
+str(CD_data_full)
+
+```
+
+```{r DB for mapping}
+
+# First we need to turn the coordinates into numeric values
+# here all the weird coordinates (the ones with multiple numbers that doesn't make sense) are transformed to NAs
+CD_data_full$utme <- as.numeric(CD_data_full$utme)
+CD_data_full$utmn <- as.numeric(CD_data_full$utmn)
 
 
+#Just keeping the coordinates for the map
+CD_for_map <- CD_data_full |>
+  select(utme, utmn, landmark_id, clan, year) |>
+  #create year column
+  #mutate(year = year(date)) |> no need anymore
+  
+  # Getting rid of any year prior to the study time frame
+  filter(year >= "1988") |> 
+  
+  #changing talek.w into talek
+  mutate(clan = str_replace_all(clan, "talek.w", "talek")) |>
+  
+  #Add a month column
+  #mutate(month = month(date)) |> not gonna do that anymore
+  
+  #Put "_" in the landmark_id columns
+  mutate(landmark_id = str_replace_all(landmark_id, " ", "_")) |>
+  #Keep only 1 distinct coordinates per den name
+  distinct(landmark_id, year, .keep_all = T) |>
+  
+  #Getting rid of utmn coordinate with more or less than 7 numbers
+  mutate(utmn = ifelse(nchar(as.character(utmn)) == 7, utmn, NA)) |>
+  #Getting rid of utme coordinate with more or less than 7 numbers
+  mutate(utme = ifelse(nchar(as.character(utme)) == 6, utme, NA)) |>
+# for these two, we will change that eventuallly but for now we get rid of them
+  
+  #Getting rid of NAs
+  drop_na(utme, utmn) |>
+  filter(utme != 0) |>
+  #removing the "." in the clan names
+  mutate(clan = str_replace_all(clan, "\\.", ""))
+
+CD_for_map$year <- as.character(CD_for_map$year)
+
+str(CD_for_map)
+
+```
 
 
+### 1.2.1. tblSession
+```{r}
+# This is with tlbSessions, we want to use tblHyenaPerSession:
+# filtering out the right clans and sessions at a CD 
+CD_sess_data <- tblSessions |>
+  subset(str_detect(clan, "talek") | str_detect(clan, "serena") | str_detect(clan, "happy.zebra")) |>
+  mutate(clan = str_replace_all(clan, "\\.", "")) |>
+  filter(location == "d") |>
+  select(session, clan, location, date, hyenas)
 
 
+LocSess_CD_data <- tblLocationsPerSession |> 
+  filter(session %in% CD_sess_data$session) |>
+  select(session, landmark_id, utme, utmn)
+
+# there is a difference of ~7000 obs 
+# Those are all the sessions before 2000 that are not in the tblLocationsPerSession
+
+```
+
+#### 1.2.1.1. Merge
+```{r Merge location with hyenas}
+# Those are all the sessions before 2000 that are not in the tblLocationsPerSession
+
+CD_LocSess_monthly_data <- merge(LocSess_CD_data, CD_sess_data, by = "session")
+
+```
 
 
+```{r}
+
+CD_monthly_data <- CD_LocSess_monthly_data |>
+  separate(date, c("year", "month", "day"), sep = "-", remove = F) |>
+  select(-day) |>
+  mutate(landmark_id = str_replace_all(landmark_id, " ", "_")) |>
+  subset(str_detect(landmark_id, "den") | str_detect(landmark_id, "Den")) |>
+  select(-utme, -utmn) |>
+  distinct(landmark_id, year, month, .keep_all = TRUE)
+
+```
+
+### i) CD_for_map
+
+```{r}
+
+CD_for_map$year <- as.character(CD_for_map$year)
+
+CD_yearly <- CD_for_map |>
+  group_by(year, clan) |>
+  summarise(CD_num = n()) |>
+  arrange(year, clan)
+
+CD_yearly
+
+CD_yearly_tab <- flextable(CD_yearly)
+save_as_html(CD_yearly_tab, path = "Tables/CD_yearly_tab.html")
 
 
+```
+### ii) CD_monthly_data_coord_clean
 
+```{r}
+CD_monthly_data_coord_clean$year <- as.character(CD_monthly_data_coord_clean$year)
 
+CD_monthly_yearly <- CD_monthly_data_coord_clean |>
+  group_by(year, month, clan) |>
+  summarise(CD_num = n()) |>
+  arrange(year, month, clan)
 
+CD_monthly_yearly
 
+CD_monthly_yearly_tab <- flextable(CD_monthly_yearly)
 
+save_as_html(CD_monthly_yearly_tab, path = "Tables/CD_monthly_yearly_tab.html")
+```
+Ok, so here I have some >10 CD in 1 month during some years. After investigation, it looks like some "d" location in tblSessions are marked d but they don't seem to be active CD locations.
 
+So I have to find a way to distinct the active dens.
 
+```{r}
 
+str(CD_sf)
+# our sf object is a list of POINTS
 
+# To extract the specific item of the list of points
+CD_sf$geometry[[2]] # give: POINT (717702 9849474)
 
+class(CD_sf$geometry[[2]]) # give : [1] "XY"    "POINT" "sfg"  
 
+#To change the name of the "geometry column": (don'T use names() function, but st_geometry)
+#st_geometry(CD_sf) <- "Den_location"
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+```
 
 
 
