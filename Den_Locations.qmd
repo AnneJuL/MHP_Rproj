@@ -10,7 +10,7 @@ editor_options:
 
 ```{r}
 
-install.packages("terra")
+#install.packages("terra")
 
 library(readr)
 library(dplyr)
@@ -137,7 +137,7 @@ CD_landcover_map
 
 ```
 
-#change to lat/long
+## change to lat/long
 ```{r}
 library(readr)
 library(sf)
@@ -176,6 +176,95 @@ CD_AllSess_data_IDs <- read_csv2("data_files/CD_AllSess_data_IDs.csv")
 ```
 
 
+## Load tables
+```{r}
 
+library(hyenadata) # MHP hyena data
+
+
+#load all tables:
+load_all_tables <- function(){
+  data(list = data(package = 'hyenadata')$results[,3], package = 'hyenadata')
+}
+
+load_all_tables()
+```
+
+## Combine tables for cub capacity of den
+```{r}
+
+#1. Select IDs and Date of birth (DOB) from tblLifeHistory.wide
+
+library(dplyr)
+
+lifehistory_dob <- tblLifeHistory.wide %>%
+  select(id, dob)
+View(lifehistory_dob)
+
+#2. Filter IDs to keep only the IDs in CD_AllSess_data_IDs
+
+filtered_data <- lifehistory_dob %>%
+  filter(id %in% CD_AllSess_data_IDs$hyenas)
+
+View(filtered_data)
+nrow(filtered_data)   # how many records left
+length(unique(filtered_data$id))   # number of unique IDs kept
+
+# 3. Join CD_AllSess_data_IDs with filtered_data by id to get the DOB column in CD_AllSess_data_IDs
+## 3.1. change id column name to hyenas
+## 3.2. join the 2 data frames together by "hyenas"
+
+filtered_data <- filtered_data %>%
+  rename(hyenas = id)
+
+CD_AllSess_data_IDs_dob <- CD_AllSess_data_IDs %>%
+  left_join(filtered_data %>% select(hyenas, dob), by = "hyenas")
+
+View(CD_AllSess_data_IDs)
+names(CD_AllSess_data_IDs)
+
+
+# 4. Create a column age we will subtract DOB with date of the session
+CD_AllSess_data_IDs_age <- CD_AllSess_data_IDs_dob %>%
+  mutate(
+    dob = as.Date(dob),
+    date = as.Date(date),
+    age = as.numeric(date - dob)   # Age in days
+  ) |>
+  filter(age>0)
+
+# 5. Create a column (cub) with 0/1, where 1 = cub at that session
+## If Age is < 365days, it means the individual is a cub and we will put a 1 in the cub session, otherwise it will be a 0
+
+CD_AllSess_data_IDs_cub <- CD_AllSess_data_IDs_age %>%
+  mutate(
+    cub = ifelse(age <= 365, "yes", "no")
+  )
+
+table(CD_AllSess_data_IDs$cub)
+
+# 6. Total number of cubs per den
+cubs_per_den <- CD_AllSess_data_IDs_cub %>%
+  group_by(landmark_id, year, session) %>%          # group by den and clan
+  summarize(
+    total_cubs = sum(cub == "yes", na.rm =T),   # total cub sessions 
+    ) %>%
+  arrange(desc(total_cubs))                # sort by most active dens
+
+View(cubs_per_den)
+
+```
+
+```{r}
+## plot
+library(ggplot2)
+
+ggplot(cubs_per_den, aes(x = reorder(landmark_id, -total_cubs), y = total_cubs, fill = clan)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Total Cubs per Den", x = "Den (Landmark ID)", y = "Total Cubs") +
+  theme_minimal()
+
+```
 
 
