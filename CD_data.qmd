@@ -105,7 +105,6 @@ load_all_tables()
 #write_csv2(tblLifeHistory.wide, "data_files/tblLifeHistory.wide.csv")
 ```
 
-
 # 1. Create data
 
 ## 1.1. Communal dens (CD) dataframe
@@ -157,8 +156,7 @@ CD_data <- merge(Sess_data, CD_SessLoc_data, by = "session")
 
 I will use tblSessions to filter out the communal dens sessions and get the month and year of use of the different CD systems.
 
-Also, we have to make sure that the CD that are recorded in a session are active communal dens. I think that using the `location` column makes it an active den, but to verify... 
-
+Also, we have to make sure that the CD that are recorded in a session are active communal dens. I think that using the `location` column makes it an active den, but to verify...
 
 ```{r with tblHyenasPerSession}
 # filtering out the right clans and sessions at a CD 
@@ -182,6 +180,7 @@ length(unique(Loc_HyenasPerSess$session)) #77178
 ### 1.2.1. Verify sessions
 
 Here I will get the difference in sessions (the 51022 sessions):
+
 ```{r Difference in sessions}
 
 HyenasPerSession_uniqueSess <- HyenasPerSession_data |>
@@ -200,6 +199,7 @@ HyenasPerSession_uniqueSess_diff <- HyenasPerSession_uniqueSess |>
 ```
 
 Now, I am going to use tblSessions (hopefully all the same sessions are in this and HyenasPerSession_uniqueSess) to add the clan column:
+
 ```{r Adding clan}
 
 HyenasPerSession_uniqueSess_clan <- tblSessions |>
@@ -231,8 +231,8 @@ length(unique(Loc_HyenasPerSess_clan$session)) # 71584
 
 ```
 
-
 Here, we redo the same uniqueSess process to see which sessions are not in LocationPerSession:
+
 ```{r}
 
 HyenasPerSession_clan_uniqueSess <- HyenasPerSession_data_clan |>
@@ -246,11 +246,13 @@ HyenasPerSession_clan_uniqueSess_diff <- HyenasPerSession_clan_uniqueSess |>
    filter(!session %in% Loc_HyenasPerSess_clan_uniqueSess$session) #50963
 
 ```
+
 Ok, so it is just the same thing... Still has everything from before 2002, then some random sessions throughout the whole study period.
 
-
 ### 1.2.2. Filter CD sess
+
 Here we keep only the den sessions. Will do that with tblSessions
+
 ```{r}
 
 CD_Sess <- tblSessions |>   # 26911
@@ -274,6 +276,7 @@ Loc_HyenasPerSess_CD <- tblLocationsPerSession |>
 ```
 
 Redo verification of the difference:
+
 ```{r}
 HyenasPerSession_CD_data_uniqueSess <- HyenasPerSession_CD_data |>
   distinct(session, .keep_all = T) # 24085
@@ -289,16 +292,13 @@ HyenasPerSession_CD_uniqueSess_diff <- HyenasPerSession_CD_data_uniqueSess |>
 
 ```
 
-
-### 1.2.3. Merge 
-
+### 1.2.3. Merge
 
 ```{r}
 
 HyenasLocPerSession_CD <- merge(Loc_HyenasPerSess_CD_uniqueSess, HyenasPerSession_CD_data, by = "session")
 
 ```
-
 
 ```{r}
 
@@ -310,22 +310,6 @@ HyenasLocPerSession_CD <- HyenasLocPerSession_CD |>
 length(unique(HyenasLocPerSession_CD$session)) 
 # 16453 sessions
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 ## 1.3. Filling utme/utmn
 
@@ -341,7 +325,6 @@ Landmarks <- tblLandmarks |>
 # now we fill the coordinates column:
 
 ```
-
 
 ```{r}
 #Just keeping the coordinates for the map
@@ -422,19 +405,16 @@ near_Fever_T_ND/CD_Cplex_" ~ "Fever_Tree_Natal_Den/Communal_Den_Complex",
 
 ```
 
-
-
-
 Joining utme and utmn columns:
+
 ```{r}
 HyenasLocPerSession_CD_coord <- HyenasLocPerSession_CD_clean |>
 left_join(Landmarks %>% select(landmark_id, utme, utmn),
             by = "landmark_id", relationship = "many-to-many")
 ```
 
-
-
 #### 1.3.1. Cleaning coordinates
+
 ```{r}
 
 HyenasLocPerSession_CD_coord_clean <- HyenasLocPerSession_CD_coord  |>
@@ -476,8 +456,6 @@ HyenasLocPerSession_CD_coord_clean <- HyenasLocPerSession_CD_coord  |>
 
 ```
 
-
-
 ```{r}
 CD_check_utme <- HyenasLocPerSession_CD_coord_clean |>
   filter(nchar(utme) != 6) # now it is 0
@@ -486,14 +464,11 @@ CD_check_utmn <- HyenasLocPerSession_CD_coord_clean |>
   filter(nchar(utmn) != 7) # now is 0
 ```
 
-
-
 ## 1.4. Active CD - tblLifeHistory.wide
 
-Here I will find a way to filter out the active dens from the non active. 
+Here I will find a way to filter out the active dens from the non active.
 
 Using the hyenas ID, I want to identify the individuals that were cubs at a given year. Then, if they were cubs and seen at a den, I will consider the den as a communal den that year. So first, I want to create a dataframe with all individual IDs and their data of birth (DOB) including the year.
-
 
 ```{r}
 
@@ -509,15 +484,17 @@ Life_history_data <- tblLifeHistory.wide |>
 
 ```
 
-
 ### 1.4.1. ActiveCD_data
+
 ```{r}
 
 ActiveCD_PerHyenas_data <- HyenasLocPerSession_CD_coord_clean |>
   #keep only the landmark_id with den in it
   subset(str_detect(landmark_id, "den") | str_detect(landmark_id, "Den")) |>
   left_join(Life_history_data %>% select(id, dob, dengrad), by = "id") %>%
-  filter(date >= dob & date <= dengrad)
+  filter(date >= dob & date <= dengrad) |>
+  filter(!utme == "744912" & !utmn == "9834809")
+
 
 
 
@@ -526,13 +503,13 @@ ActiveCD_data <- ActiveCD_PerHyenas_data |>
   distinct(session, .keep_all = T)
 
 
+
 length(unique(ActiveCD_data$landmark_id))
 #355 dens!!
 ```
 
-
-
 ### 1.4.2. Active CD year
+
 ```{r}
 ActiveCD_year <- ActiveCD_data |>
   select(-month, -day, -dob, -dengrad) |>
@@ -540,9 +517,8 @@ ActiveCD_year <- ActiveCD_data |>
 # 628 dens used in total 
 ```
 
-
-
 ### 1.4.3. Active CD unique
+
 ```{r}
 ActiveCD_unique <- ActiveCD_data |>
   select(-date, -year, -month, -day) |>
@@ -550,16 +526,11 @@ ActiveCD_unique <- ActiveCD_data |>
 #355 dens in total (no reuse)
 ```
 
-
-
-
-
 ## 1.5. All GPS locations
 
 We will be using the GPS locations of all the points that hyenas were seen. We will use that to create KDEs and then create the random points to run the RSF.
 
-So I have the table hyenas per session, which has a column for hyena IDs and session IDs. I will keep just these two rows, and filter to keep only serena's sessions and talek (not fig tree, pond, etc.).
-I will also add the individual's clan with tlbHyenas.
+So I have the table hyenas per session, which has a column for hyena IDs and session IDs. I will keep just these two rows, and filter to keep only serena's sessions and talek (not fig tree, pond, etc.). I will also add the individual's clan with tlbHyenas.
 
 ```{r Sessions with hyenas}
 
@@ -601,8 +572,6 @@ length(unique(dupe_rows_indID$id)) #20
 
 ```
 
-
-
 Slicing the hyenas with the correct clan :
 
 ```{r Sessions with hyenas}
@@ -629,7 +598,6 @@ dupes_diff_clan <- DB_ind_clan %>%
 
 
 ```
-
 
 ```{r Sessions with hyenas}
 
@@ -674,10 +642,8 @@ DB_session_hyenasID <- DB_session_hyenasID |>
 
 ```
 
-
-
-
 I have more lines in DB_session_hyenasID (122558) than in DB_hyenas_clan (128 324). The difference is 5766. Let's see what are the differences:
+
 ```{r}
 
 extra_rows <- DB_session_hyenasID |>
@@ -710,11 +676,7 @@ common_rows <- DB_session_hyenasID %>%
 
 ```
 
-
-
-
-Now that we have the sessions with all the hyenas that were seen in each of our 3 territories, we want to add the GPS location of those sessions.
-We will use tblLocationsPerSession.
+Now that we have the sessions with all the hyenas that were seen in each of our 3 territories, we want to add the GPS location of those sessions. We will use tblLocationsPerSession.
 
 ```{r Adding GPS location}
 
@@ -731,8 +693,7 @@ dupe_rows <- DB_session_hyenasID %>%
 
 ```
 
-
-Now we want to fill the NAs with the landmark ID GPS point. 
+Now we want to fill the NAs with the landmark ID GPS point.
 
 ```{r Filling the NAs}
 
@@ -851,12 +812,12 @@ DB_NAs <- DB_all_locations |>
 
 ```
 
-
 ### 1.5.1. Cleaning coordinates
 
 Now we have to deal with the weird coordinates that will create fuckall points.
 
 ex: Reach_Out_and_Touch_Mound
+
 ```{r Weird coordinates}
 DB_locations_for_MCPs_clean <- DB_locations_for_MCPs |>
   
@@ -1021,11 +982,8 @@ DB_locations_for_MCPs_clean <- DB_locations_for_MCPs |>
   
 ```
 
-
-
-
-
 To get utme and utmn values of + or - than 6 numbers:
+
 ```{r Check}
 
 DB_check_utme <- DB_locations_for_MCPs_clean |>
@@ -1036,12 +994,10 @@ DB_check_utmn <- DB_locations_for_MCPs_clean |>
 
 ```
 
-
-
-
 ### 1.5.2. Outliers
 
 Now we visualize to see if there are still weird outliers points:
+
 ```{r Visualize}
 # first convert in sf object :
 DB_locations_for_MCPs_sf <- st_as_sf(DB_locations_for_MCPs_clean, coords = c("utme", "utmn"), crs = 32736)
@@ -1052,17 +1008,10 @@ mapview(DB_locations_for_MCPs_sf, xcol = "utme", ycol = "utmn")
 
 ```
 
-The points that looks like outliers:
-- t120888
-- s58
-- t55969
-- t112359
-- s6974
-- s115706
-- s117340 
-
+The points that looks like outliers: - t120888 - s58 - t55969 - t112359 - s6974 - s115706 - s117340
 
 We remove those outliers points:
+
 ```{r Outliers}
 
 #in sf objects
@@ -1079,8 +1028,6 @@ DB_AllGPS <- DB_locations_for_MCPs_clean |>
   
 ```
 
-
-
 # 2. Save and Shapefiles
 
 SHP file contains geometrical information (for example shape type and coordinates). DBF file contains additional attribute information (for example name or temperature)
@@ -1092,22 +1039,21 @@ You can also create and sf object with st_sf, where you will have a sfc object s
 ## 2.1. Save data frame
 
 Active Den data:
+
 ```{r Save}
 write_csv2(ActiveCD_data, "data_files/ActiveCD_data.csv") # Active CD per session with date
 write.csv2(ActiveCD_unique, "data_files/ActiveCD_unique.csv") # the 355 unique CD used through the years
 write_csv2(ActiveCD_year, "data_files/ActiveCD_year.csv")
 ```
 
-
-
 All GPS location data, not just CD:
+
 ```{r Save}
 write_csv2(DB_AllGPS, "data_files/DB_AllGPS.csv")
 ```
 
-
-
 Hyena data for CD sessions:
+
 ```{r Save}
 #For fiona:
 write_csv2(ActiveCD_PerHyenas_data, "data_files/ActiveCD_PerHyenas_data.csv") #active CD with a hyena id column
@@ -1117,12 +1063,10 @@ write_csv2(ActiveCD_unique, "data_files/ActiveCD_unique.csv") #the 355 unique de
 
 ```
 
-
-
-
 ## 2.2. Shapefiles
 
 This is the locations of all the hyenas seen in the 4 territories:
+
 ```{r All GPS}
 
 # outlier:
@@ -1135,9 +1079,8 @@ DB_AllGPS_sf <- sf::st_write(DB_AllGPS_sf, "data_files/DB_AllGPS_sf.shp", delete
 
 ```
 
-
-
 Active CD hyena data:
+
 ```{r shp in UTM}
 
 #Convert the dataframe into a sf object:
@@ -1151,9 +1094,8 @@ ActiveCD_sf <- ActiveCD_sf |>
 ActiveCD_sf <- sf::st_write(ActiveCD_sf, "data_files/ActiveCD_sff.shp", delete_dsn = TRUE)
 
 ```
+
 Now, ActiveCD_sf is a sf object because we have the feature geometrics (POINTS here) with their related attributes (year, landmark_id, clan, etc.).
-
-
 
 ```{r}
 #Convert the dataframe into a sf object:
@@ -1168,7 +1110,6 @@ ActiveCD_year_sf <- sf::st_write(ActiveCD_year_sf, "data_files/ActiveCD_year_sf.
 
 ```
 
-
 ```{r}
 #Convert the dataframe into a sf object:
 ActiveCD_unique_sf <- st_as_sf(ActiveCD_unique, coords = c("utme", "utmn"), crs = 32736) #EPSG code is 32736, UTM Zone 36 South
@@ -1182,14 +1123,9 @@ ActiveCD_unique_sf <- sf::st_write(ActiveCD_unique_sf, "data_files/ActiveCD_uniq
 
 ```
 
-
-
-
-
 ## 2.3. WGS84 transform
 
 Also, to use leaflet (to make maps), we need to change the UTM coordinates into long lat : Here we transform the CD_sf into a WGS84 to use it with leaflet.
-
 
 ```{r All GSP}
 # transform in WGS84
@@ -1204,9 +1140,8 @@ DB_AllGPS_sf_wgs84 <- sf::st_write(DB_AllGPS_sf_wgs84, "data_files/DB_AllGPS_sf_
 
 ```
 
-
-
 ActiveCD data:
+
 ```{r}
 
 ActiveCD_wgs84 <- st_transform(ActiveCD_sf, crs = 4326)
@@ -1218,7 +1153,6 @@ ActiveCD_wgs84 <- sf::st_write(ActiveCD_wgs84, "data_files/ActiveCD_wgs84.shp", 
 
 ```
 
-
 ```{r}
 ActiveCD_year_wgs84 <- st_transform(ActiveCD_year_sf, crs = 4326)
 
@@ -1229,7 +1163,6 @@ ActiveCD_year_wgs84 <- sf::st_write(ActiveCD_year_wgs84, "data_files/ActiveCD_ye
 
 ```
 
-
 ```{r}
 ActiveCD_unique_wgs84 <- st_transform(ActiveCD_unique_sf, crs = 4326)
 
@@ -1239,9 +1172,6 @@ ActiveCD_unique_wgs84 <- ActiveCD_unique_wgs84 |>
 ActiveCD_unique_wgs84 <- sf::st_write(ActiveCD_unique_wgs84, "data_files/ActiveCD_unique_wgs84.shp", delete_dsn = TRUE)
 
 ```
-
-
-
 
 # 3. Data visualisation
 
@@ -1426,13 +1356,11 @@ AllGPS_mapleaflet  # display the map
 
 ```
 
-
 ```{r Save}
 #save
 htmlwidgets::saveWidget(AllGPS_mapleaflet, file = "Maps/AllGPS_mapleaflet.html", selfcontained = TRUE)
 
 ```
-
 
 ### v) Per Location
 
@@ -1479,13 +1407,11 @@ AllGPS_perlocation_mapleaflet <- AllGPS_perlocation_mapleaflet |>
 AllGPS_perlocation_mapleaflet  # display the map
 ```
 
-
 ```{r Save}
 #save
 htmlwidgets::saveWidget(AllGPS_perlocation_mapleaflet, file = "Maps/AllGPS_perlocation_mapleaflet.html", selfcontained = TRUE)
 
 ```
-
 
 ```{r Location}
 
@@ -1529,13 +1455,11 @@ AllGPS_location_perclan_mapleaflet <- AllGPS_location_perclan_mapleaflet |>
 AllGPS_location_perclan_mapleaflet  # display the map
 ```
 
-
 ```{r Save}
 #save
 htmlwidgets::saveWidget(AllGPS_location_perclan_mapleaflet, file = "Maps/AllGPS_location_perclan_mapleaflet.html", selfcontained = TRUE)
 
 ```
-
 
 ### vi) Monthly CD
 
@@ -1582,16 +1506,15 @@ CD_monthlyPerYear_mapleaflet  # display the map
 
 ```
 
-
 ```{r}
 #save
 htmlwidgets::saveWidget(CD_monthlyPerYear_mapleaflet, file = "Maps/CD_monthlyPerYear_mapleaflet.html", selfcontained = TRUE)
 ```
 
-
-
 ### vii) Active CD
+
 with active CD dataframe:
+
 ```{r}
 
 pal <- colorFactor(palette = "viridis", domain = ActiveCD_wgs84$clan)
@@ -1635,24 +1558,17 @@ ActiveCD_monthlyPerYear_mapleaflet  # display the map
 
 ```
 
-
 ```{r}
 #save
 htmlwidgets::saveWidget(ActiveCD_monthlyPerYear_mapleaflet, file = "Maps/ActiveCD_monthlyPerYear_mapleaflet.html", selfcontained = TRUE)
 ```
 
-
-
-
-
-
-
-
-## 3.2. Tables 
+## 3.2. Tables
 
 Calculate the sum of CD per year and clan.
 
 ### iii) ActiveCD_data
+
 ```{r}
 ActiveCD_data$year <- as.character(ActiveCD_data$year)
 
@@ -1676,8 +1592,6 @@ write_csv2(ActiveCD_unique_tab, "Tables/ActiveCD_unique_tab.csv")
 
 ```
 
-
-
 # 4. Prepare RSF data
 
 Before we can run an RSF, we need to prepare the database that will be used. The first step for that is to get our used GPS points, in this case, it is the den locations that were extracted and put in `CD_for_map` or `CD_sf` (CD = Communal Den). The second step is to create the clans' MCP (Minimum Convex Polygon). We will generate the 95% MCP and 100% MCP.
@@ -1688,8 +1602,6 @@ I need to determine how many points I want to sample for each points used. For e
 
 The `random_points()` function will create this `case\_` variable that will be use in the RSF later.
 
-
-
 ## 4.1. MCP by clans
 
 To make our RSF model, we need to create random points of potential locations of where the hyenas could have denned. To do that, we first need to know the extent of the clans' territory, and so we will calculate the MCP (Minimum Convex Polygon) for each clan. An MCP calculate the area that an animal uses. The MCP essentially draws a polygon around all the points where an animal has been observed.
@@ -1699,11 +1611,11 @@ Also, we are using the 95% MCP, so that it removes the 5% of outlier points.
 ### 4.1.1. Individual MCPs
 
 Here is the MCPs for all hyenas locations
+
 ```{r sp}
 # Convert all points to sp (adehabitatHR works with sp)
 AllGPS_sp <- as(DB_AllGPS_sf_wgs84, "Spatial")
 ```
-
 
 ```{r Clan 95 MCPs}
 # Create MCPs grouped by clan
@@ -1737,11 +1649,11 @@ mcp100_clan_sf <- mcp100_clan_sf |>
   rename(clan = id)
 
 ```
+
 I don't think we will be using the 100% MCP... Gives way too large MCPs.
 
-
-
 Save
+
 ```{r Save}
 
 # Save the dataframe
@@ -1749,11 +1661,10 @@ mcp95_clan_sf <- sf::st_write(mcp95_clan_sf, "data_files/mcp95_clan_sf.shp", del
 
 ```
 
-
-
 ### 4.1.2. Yearly MCPs
 
 Here is to make yearly MCPs per clans.
+
 ```{r Yearly 95% MCPs}
 
 # Create an ID that combines clan and year
@@ -1811,8 +1722,8 @@ included
 
 ```
 
-
 Save
+
 ```{r Save}
 
 #  Save the dataframe
@@ -1820,10 +1731,7 @@ mcp95_clan_year_sf <- sf::st_write(mcp95_clan_year_sf, "data_files/mcp95_clan_ye
 
 ```
 
-
-
 ### 4.1.3. Plots
-
 
 ```{r Single MCP map}
 
@@ -1837,12 +1745,10 @@ AllGPS_MCPs95_mapleaflet <- AllGPS_mapleaflet |>
 AllGPS_MCPs95_mapleaflet
 ```
 
-
 ```{r Save}
 htmlwidgets::saveWidget(AllGPS_MCPs95_mapleaflet, file = "Maps/AllGPS_MCPs95_mapleaflet.html", selfcontained = TRUE)
 
 ```
-
 
 ```{r Yearly MCPs}
 
@@ -1908,14 +1814,13 @@ AllGPS_yearly_95MCPs_mapleaflet
 
 ```
 
-
 Save
+
 ```{r}
 
 # Save the map
 htmlwidgets::saveWidget(AllGPS_yearly_95MCPs_mapleaflet, file = "Maps/AllGPS_yearly_95MCPs_mapleaflet.html", selfcontained = TRUE)
 ```
-
 
 ## 4.2. Random points
 
@@ -1930,8 +1835,8 @@ ActiveCD_wgs84_df <- ActiveCD_wgs84 |>
 presence_track <- make_track(ActiveCD_wgs84_df, long, lat, crs = 4326, clan = clan, year = year, landmark_id = landmark_id, month = month, session = session)
 ```
 
-
 ### 4.2.1. General MCP
+
 This one is with the general MCP
 
 ```{r 10 random per used}
@@ -1986,13 +1891,15 @@ RandomPointsCD_data <- RandomPointsCD_data |>
 ```
 
 Save
+
 ```{r Save}
 RandomPointsCD_data <- sf::st_write(RandomPointsCD_data, "data_files/RandomPointsCD_data.shp", delete_dsn = T)
 ```
 
-
 ### 4.2.2. Yearly MCPs
+
 Now this one is with the yearly MCP
+
 ```{r}
 # Function to generate random points per presence row
 generate_randoms <- function(pres_row, mcp_polygons, n = 10) {
@@ -2058,12 +1965,10 @@ RandomPointsCD_yearly_data <- sf::st_write(RandomPointsCD_yearly_data, "data_fil
 
 ```
 
-
-
-
 ### 4.2.3. Plots
 
 Using the yearly data points:
+
 ```{r}
 
 RandomPointsCD_mapleaflet <- leaflet() |> 
@@ -2090,15 +1995,14 @@ RandomPointsCD_mapleaflet
 
 ```
 
-
 ```{r}
 # Save the map
 htmlwidgets::saveWidget(RandomPointsCD_mapleaflet, file = "Maps/RandomPointsCD_mapleaflet.html", selfcontained = TRUE)
 
 ```
 
-
 Adding to the AllGPS
+
 ```{r}
 
 # Adding the random point in the AllGPS_yearly_95MCPs_mapleaflet
@@ -2165,15 +2069,8 @@ CD_yearly_95MCPs_withRandom_mapleaflet
 
 ```
 
-
 ```{r}
 # Save the map
 htmlwidgets::saveWidget(CD_yearly_95MCPs_withRandom_mapleaflet, file = "Maps/CD_yearly_95MCPs_withRandom_mapleaflet.html", selfcontained = TRUE)
 
 ```
-
-
-
-
-
-
