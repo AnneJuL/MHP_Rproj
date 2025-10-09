@@ -248,7 +248,7 @@ table(ActiveCD_PerHyenas_data_cubs$cub)
 
 # 6. Total number of cubs per den
 cubs_per_den <- ActiveCD_PerHyenas_data_cubs %>%
-  group_by(landmark_id, year, session) %>%          # group by den and clan
+  group_by(landmark_id, year, session, clan) %>%          # group by den and clan
   summarize(
     total_cubs = sum(cub == "yes", na.rm =T),   # total cub sessions 
     ) %>%
@@ -259,22 +259,28 @@ cubs_active <- cubs_per_den %>%
 
 View(cubs_per_den)
 
-## Filter active dens
+#saving csv data file:
+write.csv2(cubs_per_den, "data_files/cubs_per_den.csv")
+
 
 cubs_active <- cubs_per_den %>%
+  #Filter active dens
   filter(total_cubs > 0)
+  
+  
 
 ## Remove duplicate coordinates and landmarkid
-den_coords <- CD_AllSess_data_IDs %>%
+den_coords <- ActiveCD_PerHyenas_data_cubs %>%
   group_by(landmark_id) %>%
   summarise(
     utme = mean(utme, na.rm = TRUE),
     utmn = mean(utmn, na.rm = TRUE)
   )
 
-cubs_map <- cubs_map %>%
+
+cubs_map <- cubs_per_den %>%
   left_join(
-    CD_AllSess_data_IDs %>% select(landmark_id, clan) %>% distinct(),
+    ActiveCD_PerHyenas_data_cubs %>% select(landmark_id, clan) %>% distinct(),
     by = "landmark_id"
   )
 
@@ -300,7 +306,7 @@ ggplot(cubs_map, aes(x = utme, y = utmn)) +
 ```
 
 
-## Maximum cubs at den
+## Maximum cubs at den (max capacity)
 ```{r}
 # 1 Select the den with the highest cub count per landmark_id
 cubs_highest <- cubs_per_den |>
@@ -308,26 +314,12 @@ cubs_highest <- cubs_per_den |>
   slice_max(order_by = total_cubs, n = 1, with_ties = FALSE) %>%
   ungroup()
 
-# 2 Add clan information
-cubs_highest <- cubs_highest |>
-  left_join(
-    CD_AllSess_data_IDs |>
-      select(landmark_id, clan) |>
-      distinct(),
-    by = "landmark_id"
-  )
 
-# 3??? Sort dens from highest to lowest cub numbers
-cubs_highest <- cubs_highest |>
-  arrange(desc(total_cubs))
 
 # 4??? View the top dens
 View(cubs_highest)
 
 ## Plot
-
-library(dplyr)
-library(ggplot2)
 
 # Summarize total cubs per clan
 cubs_by_clan <- cubs_highest %>%
@@ -336,8 +328,6 @@ cubs_by_clan <- cubs_highest %>%
   arrange(desc(total_cubs))
 
 # Plot horizontally
-library(dplyr)
-library(ggplot2)
 
 # Summarize total cubs per den
 cubs_by_den <- cubs_highest %>%
@@ -349,7 +339,7 @@ cubs_by_den <- cubs_highest %>%
 cubs_by_den <- cubs_by_den %>% filter(total_cubs > 0)
 
 # Plot horizontally (by den, colored by clan)
-ggplot(cubs_by_den, aes(x = reorder(landmark_id, total_cubs),
+ggplot(cubs_highest, aes(x = reorder(landmark_id, total_cubs),
                         y = total_cubs,
                         fill = clan)) +
   geom_col() +
