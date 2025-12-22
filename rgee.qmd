@@ -1,0 +1,870 @@
+---
+title: "rgee"
+---
+
+
+# 0. Libraries et al.
+
+```{r Packages}
+
+#install.packages("rgee")
+
+
+# for data manipulations
+library(readr) # load data
+library(dplyr) # data manip
+
+library(hyenadata) # MHP hyena data
+
+library(tidyr) # # for data manip
+library(ggplot2) # data visualization and graphs
+library(stringr) 
+library(lubridate) # to create my year column and month one
+library(ggspatial) # to make easy maps with ggplot
+library(basemaps) # for basemap function 
+library(tidyverse)
+
+#to make maps and plotting:
+library(sf) 
+library(mapview)
+library(leaflet)
+library(leaflet.extras)
+library(amt)
+
+
+#from Guélat
+library(leaflet.extras2)
+library(terra) #to work with raster data
+library(lwgeom)
+library(spatstat.random)
+library(spdep)
+library(httr2)
+library(tmap)
+library(tmaptools)
+library(classInt)
+library(leafsync)
+library(qgisprocess)
+
+
+# for more stuff 
+library(dbscan)
+library(openrouteservice)
+library(geosphere)
+library(magrittr)
+
+
+# For rgee stuff:
+library(geojsonio)
+library(magick)
+
+library(flextable)
+
+```
+
+```{r Load MHP tables}
+#load all tables:
+load_all_tables <- function(){
+  data(list = data(package = 'hyenadata')$results[,3], package = 'hyenadata')
+}
+
+load_all_tables()
+
+```
+
+
+```{r Load dataframe}
+
+RandomPointsCD_year_data <- sf::st_read("data_files/RandomPointsCD_year_data.shp")
+
+```
+
+
+
+
+
+
+# 1. Installing rgee
+
+I will use rgee package to get different spatial covariables : 
+
+-   Land cover (bush vs plains, etc.)\*
+
+-   Elevation\*
+
+-   Distance to edge of territory\*
+
+-   Distance to water\*
+
+-   NDVI
+
+
+rgee is a package that is use to call Google Earth Engine API in R. Google Earth Engine is a cloud-based platform designed for planetary-scale environmental data analysis, offering access to a vast archive of remote sensing data and the ability to perform geospatial analysis on Google's infrastructure. While Google Earth Engine officially supports Python and JavaScript client libraries, rgee bridges this gap for R users by utilizing the reticulate package to wrap the Earth Engine Python API. This allows R users to interact with GEE and leverage its capabilities using a familiar R interface, facilitating rapid development and integration with other open-source R packages for spatial data analysis.
+
+
+Setting up a google earth engine project first.
+
+The first time I need to install conda, create the rgee environment within the conda thing. 
+
+I followed the steps here to have it finally worked: https://gis.stackexchange.com/questions/473730/authentification-error-when-installing-rgee-in-rstudio?newreg=3674f3f594ee4f91856aa2e5df5b204d
+
+
+```{r}
+#to get rgeeExtra, to use things like the gif animation
+#remotes::install_github("r-earthengine/rgeeExtra")
+
+```
+
+Here are the lines that needed to be run the first time, but now I don't need them anymore. Might need to rerun them when ee_Initialize doesn't work.
+```{r }
+#library(reticulate)
+
+#install.packages("rgee")
+#reticulate::conda_install(envname = "rgee", packages = "earthengine-api=0.1.370", channel = "conda-forge", python_version = "3.9")
+```
+
+```{r}
+library(reticulate)
+
+#This is to tell R to use the right Python environment
+use_condaenv("rgee", required = TRUE)
+
+# verify puthon version
+py_config()
+```
+
+```{r}
+
+#Load rgee:
+library(rgee)
+library(rgeeExtra)
+
+#check ee API version
+ee_check()
+```
+
+```{r}
+
+```
+
+
+
+Initialize rgee
+```{r}
+#Initialize EE 
+ee_Initialize()
+#important to initialize earth engine without the user and project argument here
+```
+
+
+This will need to be run when ee_Initialize is not working.
+```{r}
+#To get credentials: (need to run it once in a while when ee_Initialize doesn't work)
+ee_Authenticate()
+
+ee_clean_user_credentials()
+#toforce it:
+ee_Authenticate(auth_mode = "notebook")
+
+```
+
+## 1.1. Checking 
+The ee_check() function will help for checking the sanity of the rgee installation and dependencies.
+
+- ee_check_python() - Python version
+- ee_check_credentials() - Google Drive and GCS credentials
+- ee_check_python_packages() - Python packages
+
+```{r}
+ee_check()
+
+ee_check_python()
+ee_check_credentials()
+ee_check_python_packages()
+```
+
+
+
+## 1.2. Tests
+```{r}
+
+# test to make sure all is running smoothly:
+ee$Image("CGIAR/SRTM90_V4")$getInfo()
+ee$String('Hello from the Earth Engine servers!')$getInfo()
+
+```
+
+
+### i) Night time lights
+From : https://github.com/r-spatial/rgee
+To Compute the trend of night-time lights
+
+Let's create a new band containing the image date as years since 1991 by extracting the year of the image acquisition date and subtracting it from 1991.
+```{r}
+
+createTimeBand <-function(img) {
+  year <- ee$Date(img$get('system:time_start'))$get('year')$subtract(1991L) 
+  ee$Image(year)$byte()$addBands(img)
+}
+
+#Use your TimeBand function to map it over the night-time lights collection.
+
+collection <- ee$
+  ImageCollection('NOAA/DMSP-OLS/NIGHTTIME_LIGHTS')$
+  select('stable_lights')$
+  map(createTimeBand)
+
+# Compute a linear fit over the series of values at each pixel, so that you can visualize the y-intercept as green, and the positive/negative slopes as red/blue.
+col_reduce <- collection$reduce(ee$Reducer$linearFit())
+col_reduce <- col_reduce$addBands(
+  col_reduce$select('scale'))
+ee_print(col_reduce)
+
+# to visualize the map: 
+Map$setCenter(9.08203, 47.39835, 3)
+Map$addLayer(
+  eeObject = col_reduce,
+  visParams = list(
+    bands = c("scale", "offset", "scale"),
+    min = 0,
+    max = c(0.18, 20, -0.18)
+  ),
+  name = "stable lights trend"
+)
+
+```
+
+
+### ii) Worldwide elevation map
+From: https://cran.r-project.org/web/packages/rgee/vignettes/rgee01.html
+
+SRTM (Shuttle Radar Topography Mission) elevation values worldwide:
+```{r}
+
+#create a ee object
+srtm <- ee$Image("USGS/SRTMGL1_003")
+
+#Define visualization parameters
+viz <- list(
+  max = 4000,
+  min = 0,
+  palette = c("#000000","#5AAD5A","#A9AD84","#FFFFFF"))
+
+# using Map$addLayer to visualize the map interactively
+Map$addLayer(
+  eeObject = srtm,
+  visParams =  viz,
+  name = 'SRTM')
+
+```
+
+
+### iii) Precipitation
+From: https://github.com/r-spatial/rgee
+
+To play with some precipitation data: 
+
+nc = North Carolina counties, 100 simple features with 14 attributes
+```{r}
+# to read the nc shapefile:
+nc <- st_read(system.file("shape/nc.shp", package = "sf"), quiet = TRUE)
+
+plot(nc)
+
+# will use the Terraclimate database
+terraclimate <- ee$ImageCollection("IDAHO_EPSCOR/TERRACLIMATE") %>%
+  ee$ImageCollection$filterDate("2001-01-01", "2002-01-01") %>%
+  ee$ImageCollection$map(function(x) x$select("pr")) %>% # Select only precipitation bands
+  ee$ImageCollection$toBands() %>% # from imagecollection to image
+  ee$Image$rename(sprintf("PP_%02d",1:12)) # rename the bands of an image
+
+# to extract monthly precipitation:
+ee_nc_rain <- ee_extract(x = terraclimate, y = nc["NAME"], sf = FALSE)
+
+```
+
+ee_extract will help you to extract monthly precipitation values from the Terraclimate ImageCollection. ee_extract works similar to raster::extract, you just need to define: the ImageCollection object (x), the geometry (y), and a function to summarize the values (fun).
+
+```{r}
+# then we visualize it using ggplot:
+ee_nc_rain %>%
+  pivot_longer(-NAME, names_to = "month", values_to = "pr") %>%
+  mutate(month, month=gsub("PP_", "", month)) %>%
+  ggplot(aes(x = month, y = pr, group = NAME, color = pr)) +
+  geom_line(alpha = 0.4) +
+  xlab("Month") +
+  ylab("Precipitation (mm)") +
+  theme_minimal()
+```
+
+### iv) NDVI animation
+
+From: https://github.com/r-spatial/rgee
+
+To create a NDVI animation map (Peru's Arequepia region)
+ 
+```{r}
+
+#Define the regional bounds of animation frames and a mask to clip the NDVI data by.
+mask <- system.file("shp/arequipa.shp", package = "rgee") %>%
+  st_read(quiet = TRUE) %>%
+  sf_as_ee()
+region <- mask$geometry()$bounds()
+
+
+#Retrieve the MODIS Terra Vegetation Indices 16-Day Global 1km dataset as an ee.ImageCollection and then, select the NDVI band.
+
+col <- ee$ImageCollection('MODIS/006/MOD13A2')$select('NDVI')
+
+#Group images by composite date
+col <- col$map(function(img) {
+  doy <- ee$Date(img$get('system:time_start'))$getRelative('day', 'year')
+  img$set('doy', doy)
+})
+distinctDOY <- col$filterDate('2013-01-01', '2014-01-01')
+
+```
+
+Now, let's define a filter that identifies which images from the complete collection match the DOY from the distinct DOY collection.
+```{r}
+filter <- ee$Filter$equals(leftField = 'doy', rightField = 'doy')
+
+```
+Define a join and convert the resulting FeatureCollection to an ImageCollection... it will take you only 2 lines of code!
+
+```{r}
+join <- ee$Join$saveAll('doy_matches')
+joinCol <- ee$ImageCollection(join$apply(distinctDOY, col, filter))
+```
+
+Apply median reduction among the matching DOY collections.
+
+```{r}
+comp <- joinCol$map(function(img) {
+  doyCol = ee$ImageCollection$fromImages(
+    img$get('doy_matches')
+  )
+  doyCol$reduce(ee$Reducer$median())
+})
+
+#define RGB visualization parameters first.
+visParams = list(
+  min = 0.0,
+  max = 9000.0,
+  bands = "NDVI_median",
+  palette = c(
+    'FFFFFF', 'CE7E45', 'DF923D', 'F1B555', 'FCD163', '99B718', '74A901',
+    '66A000', '529400', '3E8601', '207401', '056201', '004C00', '023B01',
+    '012E01', '011D01', '011301'
+  )
+)
+
+#Create RGB visualization images for use as animation frames.
+rgbVis <- comp$map(function(img) {
+  do.call(img$visualize, visParams) %>%
+    ee$Image$clip(mask)
+})
+
+
+#GIF visualization parameters.
+gifParams <- list(
+  region = region,
+  dimensions = 600,
+  crs = 'EPSG:3857',
+  framesPerSecond = 10
+)
+
+# get month names: 
+dates_modis_mabbr <- distinctDOY %>%
+  ee_get_date_ic %>% # Get Image Collection dates
+  '[['("time_start") %>% # Select time_start column
+  lubridate::month() %>% # Get the month component of the datetime
+  '['(month.abb, .) # subset around month abbreviations
+```
+
+Finally, we use ee_utils_gif_* functions to render the GIF animation and add some texts.
+```{r}
+
+animation <- ee_utils_gif_creator(rgbVis, gifParams, mode = "wb")
+animation %>%
+  ee_utils_gif_annotate(
+    text = "NDVI: MODIS/006/MOD13A2",
+    size = 15, color = "white",
+    location = "+10+10"
+  ) %>%
+  ee_utils_gif_annotate(
+    text = dates_modis_mabbr,
+    size = 30,
+    location = "+290+350",
+    color = "white",
+    font = "arial",
+    boxcolor = "#000000"
+  ) # -> animation_wtxt
+
+#to save it
+# ee_utils_gif_save(animation_wtxt, path = "raster_as_ee.gif")
+
+```
+
+
+
+## 1.3. Masai Mara geometry
+
+Here, we will get the Masai Mara polygon, which will be use to extract the land cover, elevation, water, etc. for our used and available points in `RandomPointsCD_yearly_data`.
+
+Here, we’ll query the WDPA protected-areas layer in GEE and filter for "Masai Mara" to avoid manually drawing or copying coordinates.
+
+
+```{r Masai Mara}
+# WDPA featurecollection (server-side)
+wdpa <- ee$FeatureCollection("WCMC/WDPA/current/polygons")
+
+# filter for features whose NAME contains "Masai Mara"
+mara_fc <- wdpa$filter(ee$Filter$stringContains('NAME', 'Masai Mara'))
+
+mara_geom <- mara_fc$geometry()   # keep geometry in EE
+```
+
+
+
+
+
+
+
+# 2. Land cover (rgee)
+
+I will use the package rgee (Google Earth Engine for R), which was installed in section 1.
+
+## 2.1. Extract land cover
+
+Now we extract the land cover. We will use the ESA WorldCover dataset, which is a 10m global land cover with 11 classes. It is supposedely great for small-scale features like our den locations. This is going to be for 2020 landcover.
+
+See: 
+- https://developers.google.com/earth-engine/datasets/catalog/ESA_WorldCover_v100?hl=fr
+- https://esa-worldcover.org/en
+- https://worldcover2020.esa.int/viewer
+- https://www.arcgis.com/home/item.html?id=e28b7e1da5414010ba4f47dd5a3c3ebb (for the classes code)
+
+
+```{r}
+# Load land cover (WorldCover 10m)
+WorldCover <- ee$ImageCollection("ESA/WorldCover/v100")$first()$select("Map")
+
+# Clip to Mara (still server-side)
+MasaiMara_landcover_WC <- WorldCover$clip(mara_geom)
+
+# quick map to see (rgee interactive map):
+MasaiMara_landcover_map <- Map$addLayer(MasaiMara_landcover_WC, list(bands = "Map"), "WorldCover 10m (Map)")
+MasaiMara_landcover_map
+
+```
+
+```{r}
+# Save the map
+htmlwidgets::saveWidget(MasaiMara_landcover_map, file = "Maps/MasaiMara_landcover_map.html", selfcontained = TRUE)
+```
+
+
+Now we sample the landcover at our used and random points :
+```{r}
+# Sample at your points (points_sf is your sf dataframe of den + available points)
+RandomPointsCD_year_data_ee <- sf_as_ee(RandomPointsCD_year_data)
+
+RandomPointsCD_data_sampled <- MasaiMara_landcover_WC$sampleRegions(
+  collection = RandomPointsCD_year_data_ee,
+  scale = 10,
+  geometries = TRUE)
+
+# Bring only the sampled results to R (much smaller)
+RandomPointsCD_landcover <- ee_as_sf(RandomPointsCD_data_sampled, maxFeatures = 20000)
+
+
+```
+
+```{r}
+
+RandomPointsCD_data <- RandomPointsCD_landcover |>
+  mutate(landcover = dplyr::recode(Map,
+    `10` = "Tree",
+    `20` = "Shrub",
+    `30` = "Grass",
+    `40` = "Cropland",
+    `50` = "Built-up",
+    `60` = "Bare",
+    `80` = "Water",
+    `90` = "Wetland")) |>
+  select(-Map)
+
+```
+
+
+## 2.2. Map
+
+```{r}
+# Color palette for land cover
+pal_lc <- colorFactor(palette = "Set2",  # or "viridis", or custom c("green","yellow",...)
+                      domain = RandomPointsCD_data$landcover)
+
+# keeping only the used points
+CD_landcover <- RandomPointsCD_data |>
+  filter(case == 1)
+
+
+# make a base map
+CD_landcover_mapleaflet <- leaflet(CD_landcover) |>
+  addTiles()
+
+# loop over clans and add each as a separate group
+for (cl in unique(CD_landcover$clan)) {
+  CD_landcover_mapleaflet <- CD_landcover_mapleaflet |>
+    addCircleMarkers(
+      data = filter(CD_landcover, clan == cl),
+      color = ~pal_lc(landcover),
+      fillOpacity = 0.8,
+      group = cl,
+      radius = 3,
+      stroke = FALSE,
+      popup = ~paste("Clan:", clan, "<br>", 
+                     "LC:", landcover, "<br>",
+                     "Landmark:", lndmrk_))
+}
+
+# add toggle control
+CD_landcover_mapleaflet <- CD_landcover_mapleaflet |>
+  addLayersControl(
+    overlayGroups = unique(CD_landcover$clan),
+    options = layersControlOptions(collapsed = FALSE)) |>
+  addLegend("bottomright", pal = pal_lc, values = ~landcover,
+            title = "Land cover", opacity = 1)
+
+CD_landcover_mapleaflet
+
+```
+
+```{r Save}
+#save
+htmlwidgets::saveWidget(CD_landcover_mapleaflet, file = "Maps/CD_landcover_mapleaflet.html", selfcontained = TRUE)
+
+```
+
+
+
+##### Overlay landcover with Den location:
+```{r Masai Mara + CD Map}
+
+# Visualization parameters (classes + colors)
+landcover_palette <- c(
+  "#006400", # Tree cover
+  "#ffbb22", # Shrubland
+  "#ffff4c", # Grassland
+  "#f096ff", # Cropland
+  "#fa0000", # Built-up
+  "#b4b4b4", # Bare / sparse vegetation
+  "#f0f0f0", # Snow / ice
+  "#0064c8", # Permanent water bodies
+  "#0096a0", # Herbaceous wetland
+  "#00cf75", # Mangroves
+  "#fae6a0", # Moss & lichen
+  "#000000"  # No data
+)
+
+landcover_classes <- c(
+  "Tree cover", "Shrubland", "Grassland", "Cropland", "Built-up",
+  "Bare / sparse", "Snow / Ice", "Water", "Wetland",
+  "Mangroves", "Moss/Lichen", "No data")
+
+MasaiMara_CD_map <- MasaiMara_landcover_map |>
+  # to save it with esri world imagery:
+  addProviderTiles(providers$Esri.WorldImagery) |>
+  addLegend(
+    position = "bottomright",
+    colors = landcover_palette,
+    labels = landcover_classes,
+    title = "ESA WorldCover 2020") |>
+  addCircleMarkers(
+    data = CD_landcover, 
+    color = "red",
+    radius = 1,
+    fillOpacity = 0.9,
+    popup = ~paste("Clan:", clan, "<br>Year:", year))
+
+
+MasaiMara_CD_map
+
+```
+
+```{r}
+#save
+htmlwidgets::saveWidget(MasaiMara_CD_map, file = "Maps/MasaiMara_CD_map.html", selfcontained = TRUE)
+
+```
+
+
+
+
+## 2.3. Table
+
+```{r}
+
+landcover_table_sum <- CD_landcover |>
+  st_drop_geometry() |>
+  group_by(landcover) |>
+  summarise(n_used = n()) |>
+  arrange(desc(n_used))
+
+landcover_table_sum
+
+landcover_tab_sum <- flextable(landcover_table_sum)
+save_as_html(landcover_tab_sum, path = "Tables/landcover_tab_sum.html")
+
+
+```
+
+Save dataframe:
+```{r}
+
+RandomPointsCD_data <- sf::st_write(RandomPointsCD_data, "data_files/RandomPointsCD_data.shp", delete_dsn = TRUE)
+
+```
+
+
+
+
+## 1.4. Elevation
+
+We will use the rgee package again to extrat elevation of the Masai Mara. The dataset is SRTM Digital Elevation (30 m). 
+
+We will use the `mara_geom` to extract the elevation just like I did with the land cover.
+
+```{r}
+
+# 1. Load SRTM DEM
+srtm <- ee$Image("USGS/SRTMGL1_003")
+
+
+# 2. Clip DEM to Masai Mara area
+srtm_mara <- srtm$clip(mara_geom)
+
+# 3. Extract elevation for your points
+RandomPointsCD_elevation <- sf_as_ee(RandomPointsCD_data)
+
+sampled_elevation <- srtm_mara$sampleRegions(
+  collection = RandomPointsCD_elevation,
+  scale = 30,      # resolution in meters
+  geometries = TRUE)
+
+# 4. Bring back to R
+sampled_elevation_sf <- ee_as_sf(sampled_elevation, maxFeatures = 20000)
+
+# 5. Merge back into your dataframe
+RandomPointsCD_data <- sampled_elevation_sf
+
+```
+
+
+### 1.5.1. Map 
+
+```{r}
+
+elev_vis <- list(
+  min = 1200,  # lowest elevation in Mara (adjust if needed)
+  max = 2200,  # highest elevation in Mara
+  palette = c("#e5f5e0", "#a1d99b", "#31a354"))  # light → medium → dark green
+
+
+Map$centerObject(mara_geom, zoom = 9)
+
+Elevation_map <- Map$addLayer(srtm_mara, elev_vis, "Elevation (m)")
+Elevation_map
+```
+
+```{r}
+#save
+htmlwidgets::saveWidget(Elevation_map, file = "Maps/Elevation_map.html", selfcontained = TRUE)
+```
+
+
+```{r}
+
+CD_elevation <- RandomPointsCD_data |>
+  filter(case == 1)
+
+CD_elevation_map <- Elevation_map |>
+  # to save it with esri world imagery:
+  addProviderTiles(providers$Esri.WorldImagery) |>
+  
+  addCircleMarkers(
+    data = CD_landcover, 
+    color = "red",
+    radius = 1,
+    fillOpacity = 0.9,
+    popup = ~paste("Clan:", clan, "<br>Year:", year))
+
+
+CD_elevation_map
+
+```
+
+```{r}
+#save
+htmlwidgets::saveWidget(CD_elevation_map, file = "Maps/CD_elevation_map.html", selfcontained = TRUE)
+```
+
+
+
+## 1.6. NDVI
+
+```{r}
+# Load MODIS NDVI (MOD13Q1, 250 m)
+ndvi <- ee$ImageCollection("MODIS/061/MOD13Q1")$
+  filterDate("2020-01-01", "2020-12-31")$  # adjust year if needed
+  select("NDVI")$
+  mean()  # average over the year
+
+# Clip to Mara
+ndvi_mara <- ndvi$clip(mara_geom)
+
+# Visualize NDVI
+ndvi_vis <- list(min = 0, max = 9000, palette = c("white","yellow","green"))
+
+
+Map$centerObject(mara_geom, zoom = 9)
+ndvi_map <- Map$addLayer(ndvi_mara, ndvi_vis, "NDVI")
+ndvi_map
+```
+
+```{r}
+htmlwidgets::saveWidget(ndvi_map, file = "Maps/ndvi_map.html", selfcontained = TRUE)
+```
+
+
+
+```{r}
+
+# Convert your sf points to ee objects
+RandomPointsCD_ndvi <- sf_as_ee(RandomPointsCD_data)
+
+# Sample NDVI at points
+sampled_ndvi <- ndvi_mara$sampleRegions(
+  collection = RandomPointsCD_ndvi,
+  scale = 250,       # MODIS resolution
+  geometries = TRUE)
+
+# Bring to R
+sampled_ndvi_sf <- ee_as_sf(sampled_ndvi, maxFeatures = 20000)
+
+RandomPointsCD_data <- sampled_ndvi_sf
+```
+
+
+```{r}
+RandomPointsCD_data <- sf::st_write(RandomPointsCD_data, "data_files/RandomPointsCD_data.shp", delete_dsn = TRUE)
+
+```
+
+
+
+### 1.6.1. Map
+
+```{r}
+
+CD_ndvi <- RandomPointsCD_data |>
+  filter(case == 1)
+
+CD_ndvi_map <- ndvi_map |>
+  # to save it with esri world imagery:
+  addProviderTiles(providers$Esri.WorldImagery) |>
+  
+  addCircleMarkers(
+    data = CD_ndvi, 
+    color = "red",
+    radius = 1,
+    fillOpacity = 0.9,
+    popup = ~paste("Clan:", clan, "<br>Year:", year))
+
+
+CD_ndvi_map
+
+```
+
+```{r}
+#save
+htmlwidgets::saveWidget(CD_ndvi_map, file = "Maps/CD_ndvi_map.html", selfcontained = TRUE)
+```
+
+
+## 3. Water
+
+### 1.7.1. Identidy water source
+
+We will use the JRC Global Surface Water dataset. This makes polygons where there is water detected.
+
+```{r Water Source}
+# Load JRC Global Surface Water
+gsw <- ee$Image("JRC/GSW1_4/GlobalSurfaceWater")$select("occurrence")
+
+# Permanent water mask (>90% occurrence)
+water_mask <- gsw$gt(90)
+
+# Convert water pixels to vector polygons
+water_fc <- water_mask$reduceToVectors(
+  geometry = mara_geom,
+  geometryType = "polygon",
+  scale = 30,          # MODIS/SRTM resolution is fine
+  bestEffort = TRUE,
+  maxPixels = 1e13)
+
+```
+
+```{r}
+# Visualize Masai Mara boundary
+Map$centerObject(mara_geom, zoom = 10)
+Map$addLayer(mara_fc, list(color = "blue"), "Masai Mara Boundary")
+
+# Add water polygons
+Map$addLayer(water_fc, list(color = "cyan"), "Water Polygons")
+```
+Now, this gives me only the Mara River, not the Talek river. I need to find a way to get all the water sources, maybe even seasonnally? Like every month of the year or something? and also identify the areas that are marsh and use it too.
+
+
+
+```{r}
+
+RandomPointsCD_water <- sf_as_ee(RandomPointsCD_data)
+
+sampled_dist_water <- dist_to_water$sampleRegions(
+  collection = RandomPointsCD_water,
+  scale = 10,       # match your land cover resolution
+  geometries = TRUE)
+
+sampled_dist_water_sf <- ee_as_sf(sampled_dist_water)
+View(sampled_dist_water_sf)
+
+
+RandomPointsCD_data <- sampled_dist_water_sf
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
