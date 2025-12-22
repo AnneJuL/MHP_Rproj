@@ -525,7 +525,45 @@ RandomPointsCD_data <- RandomPointsCD_year_data |>
     `17` = "Water", 
     `18` = "Emergent_wetland", 
     `20` = "Wet_meadow"))
+
+RandomPointsCD_data <- RandomPointsCD_data |>
+  filter(session != "t60535") |>
+  filter(session != "t60367") |>
+  filter(lndmrk_ != "Rocky_Spot")
+
+# is there any lndmrk without den in the name: 
+RandomPointsCD_data_dens <- RandomPointsCD_data |>
+ filter(!grepl("den|_D\\b", lndmrk_, ignore.case = TRUE))
+
+
+
 ```
+
+
+```{r}
+
+CD_points <- RandomPointsCD_data |>
+  filter(case == "1")
+
+test_map <- CD_points |>
+  filter(session == "s11535")
+
+mapview(test_map)
+
+```
+
+Verify landmarks
+```{r}
+
+landmark <- tblLandmarks |>
+  filter(landmark_id == "Mr. Cluck's Chicken Shack Den")
+
+landmark_sf <- st_as_sf(landmark, coords = c("utme", "utmn"), crs = 32736)
+
+mapview(landmark_sf)
+```
+
+
 
 ### 1.3.2. Map
 
@@ -607,6 +645,32 @@ htmlwidgets::saveWidget(Mara_LULC_CDRandom_leaflet, file = "Maps/Mara_LULC_CDRan
 
 
 
+### 1.3.3. Landcover with NAs
+```{r}
+RandomPointsCD_data_landcoverNA <- RandomPointsCD_data |>
+  filter(is.na(landcover))
+
+
+mapview(RandomPointsCD_data_landcoverNA)
+
+```
+
+
+I will put a temporary value for those points that are outside of the Mara:
+```{r}
+
+RandomPointsCD_data <- RandomPointsCD_data |>
+  mutate(landcover = replace_na(landcover, "outside"))
+
+
+RandomPointsCD_data_landcoverOutside <- RandomPointsCD_data |>
+  filter(landcover == "outside")
+mapview(RandomPointsCD_data_landcoverOutside)
+
+
+```
+
+
 
 ## 1.4. Distance to water
 
@@ -622,8 +686,34 @@ To get the distance to the closest water source, here are the steps we need to d
 # create binary water raster (1 = water, NA = non-water)
 water_rast <- Mara_LULC == 17
 
+# map:
+plot(water_rast)
 ```
 
+
+Compute distance to nearest water pixel
+This computes Euclidean distance from every pixel to the closest water pixel.
+
+```{r}
+dist_to_water <- distance(water_rast)
+
+plot(dist_to_water)
+```
+
+
+Calculating distance from water for each used and available points:
+```{r}
+
+RandomPointsCD_data <- st_transform(RandomPointsCD_data, crs(dist_to_water))
+
+# extract distance
+RandomPointsCD_data$dist_water_m <- terra::extract(
+  dist_to_water,
+  vect(RandomPointsCD_data)
+)[,2]
+
+
+```
 
 
 
