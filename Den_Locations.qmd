@@ -24,7 +24,6 @@ library(tidyterra)
 
 ## 1. Import Data
 
-
 ```{r}
 
 den_data <- read_delim("data_files/ActiveCD_data.csv")
@@ -56,12 +55,11 @@ den_summary <- den_data %>%
 
 ## 2. Map
 
-
 Uploading landcover grassland raster.
+
 ```{r}
 Mara_LULC <- terra::rast("Mara_LULC/Mara_LULC_2018.tif")
 ```
-
 
 ```{r}
 
@@ -78,7 +76,6 @@ landcover_map <- ggplot(Mara_LULC_df, aes(x, y, fill = landcover))+
 
 landcover_map
 ```
-
 
 ```{r}
 
@@ -98,8 +95,8 @@ CD_plot
 
 ```
 
-
 Put lancover map in background:
+
 ```{r}
 
 CD_landcover_map <- ggplot()+
@@ -139,6 +136,7 @@ CD_landcover_map
 ```
 
 ## change to lat/long
+
 ```{r}
 library(readr)
 library(sf)
@@ -168,8 +166,8 @@ write_csv(den_latlon_df, "Tables/ActiveCD_unique_tab_latlon.csv")
 
 ```
 
-
 ## Cub data
+
 ```{r}
 
 #import cub data
@@ -180,8 +178,8 @@ ActiveCD_PerHyenas_data <- read_csv2("data_files/ActiveCD_PerHyenas_data.csv")
 
 ```
 
-
 ## Load tables
+
 ```{r}
 
 library(hyenadata) # MHP hyena data
@@ -196,6 +194,7 @@ load_all_tables()
 ```
 
 ## Combine tables for cub capacity of den
+
 ```{r}
 
 #1. Select IDs and Date of birth (DOB) from tblLifeHistory.wide
@@ -305,8 +304,8 @@ ggplot(cubs_map, aes(x = utme, y = utmn)) +
 
 ```
 
-
 ## Maximum cubs at den (max capacity)
+
 ```{r}
 # 1 Select the den with the highest cub count per landmark_id
 cubs_highest <- cubs_per_den |>
@@ -353,4 +352,3 @@ ggplot(cubs_highest, aes(x = reorder(landmark_id, total_cubs),
 
 
 ```
-
