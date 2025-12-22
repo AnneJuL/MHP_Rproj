@@ -2,7 +2,6 @@
 title: "rgee"
 ---
 
-
 # 0. Libraries et al.
 
 ```{r Packages}
@@ -71,21 +70,15 @@ load_all_tables()
 
 ```
 
-
 ```{r Load dataframe}
 
 RandomPointsCD_year_data <- sf::st_read("data_files/RandomPointsCD_year_data.shp")
 
 ```
 
-
-
-
-
-
 # 1. Installing rgee
 
-I will use rgee package to get different spatial covariables : 
+I will use rgee package to get different spatial covariables :
 
 -   Land cover (bush vs plains, etc.)\*
 
@@ -97,16 +90,13 @@ I will use rgee package to get different spatial covariables :
 
 -   NDVI
 
-
 rgee is a package that is use to call Google Earth Engine API in R. Google Earth Engine is a cloud-based platform designed for planetary-scale environmental data analysis, offering access to a vast archive of remote sensing data and the ability to perform geospatial analysis on Google's infrastructure. While Google Earth Engine officially supports Python and JavaScript client libraries, rgee bridges this gap for R users by utilizing the reticulate package to wrap the Earth Engine Python API. This allows R users to interact with GEE and leverage its capabilities using a familiar R interface, facilitating rapid development and integration with other open-source R packages for spatial data analysis.
-
 
 Setting up a google earth engine project first.
 
-The first time I need to install conda, create the rgee environment within the conda thing. 
+The first time I need to install conda, create the rgee environment within the conda thing.
 
 I followed the steps here to have it finally worked: https://gis.stackexchange.com/questions/473730/authentification-error-when-installing-rgee-in-rstudio?newreg=3674f3f594ee4f91856aa2e5df5b204d
-
 
 ```{r}
 #to get rgeeExtra, to use things like the gif animation
@@ -115,6 +105,7 @@ I followed the steps here to have it finally worked: https://gis.stackexchange.c
 ```
 
 Here are the lines that needed to be run the first time, but now I don't need them anymore. Might need to rerun them when ee_Initialize doesn't work.
+
 ```{r }
 #library(reticulate)
 
@@ -146,17 +137,16 @@ ee_check()
 
 ```
 
-
-
 Initialize rgee
+
 ```{r}
 #Initialize EE 
 ee_Initialize()
 #important to initialize earth engine without the user and project argument here
 ```
 
-
 This will need to be run when ee_Initialize is not working.
+
 ```{r}
 #To get credentials: (need to run it once in a while when ee_Initialize doesn't work)
 ee_Authenticate()
@@ -167,12 +157,13 @@ ee_Authenticate(auth_mode = "notebook")
 
 ```
 
-## 1.1. Checking 
+## 1.1. Checking
+
 The ee_check() function will help for checking the sanity of the rgee installation and dependencies.
 
-- ee_check_python() - Python version
-- ee_check_credentials() - Google Drive and GCS credentials
-- ee_check_python_packages() - Python packages
+-   ee_check_python() - Python version
+-   ee_check_credentials() - Google Drive and GCS credentials
+-   ee_check_python_packages() - Python packages
 
 ```{r}
 ee_check()
@@ -182,9 +173,8 @@ ee_check_credentials()
 ee_check_python_packages()
 ```
 
-
-
 ## 1.2. Tests
+
 ```{r}
 
 # test to make sure all is running smoothly:
@@ -193,12 +183,12 @@ ee$String('Hello from the Earth Engine servers!')$getInfo()
 
 ```
 
-
 ### i) Night time lights
-From : https://github.com/r-spatial/rgee
-To Compute the trend of night-time lights
+
+From : https://github.com/r-spatial/rgee To Compute the trend of night-time lights
 
 Let's create a new band containing the image date as years since 1991 by extracting the year of the image acquisition date and subtracting it from 1991.
+
 ```{r}
 
 createTimeBand <-function(img) {
@@ -233,11 +223,12 @@ Map$addLayer(
 
 ```
 
-
 ### ii) Worldwide elevation map
+
 From: https://cran.r-project.org/web/packages/rgee/vignettes/rgee01.html
 
 SRTM (Shuttle Radar Topography Mission) elevation values worldwide:
+
 ```{r}
 
 #create a ee object
@@ -257,13 +248,14 @@ Map$addLayer(
 
 ```
 
-
 ### iii) Precipitation
+
 From: https://github.com/r-spatial/rgee
 
-To play with some precipitation data: 
+To play with some precipitation data:
 
 nc = North Carolina counties, 100 simple features with 14 attributes
+
 ```{r}
 # to read the nc shapefile:
 nc <- st_read(system.file("shape/nc.shp", package = "sf"), quiet = TRUE)
@@ -301,7 +293,7 @@ ee_nc_rain %>%
 From: https://github.com/r-spatial/rgee
 
 To create a NDVI animation map (Peru's Arequepia region)
- 
+
 ```{r}
 
 #Define the regional bounds of animation frames and a mask to clip the NDVI data by.
@@ -325,10 +317,12 @@ distinctDOY <- col$filterDate('2013-01-01', '2014-01-01')
 ```
 
 Now, let's define a filter that identifies which images from the complete collection match the DOY from the distinct DOY collection.
+
 ```{r}
 filter <- ee$Filter$equals(leftField = 'doy', rightField = 'doy')
 
 ```
+
 Define a join and convert the resulting FeatureCollection to an ImageCollection... it will take you only 2 lines of code!
 
 ```{r}
@@ -381,7 +375,8 @@ dates_modis_mabbr <- distinctDOY %>%
   '['(month.abb, .) # subset around month abbreviations
 ```
 
-Finally, we use ee_utils_gif_* functions to render the GIF animation and add some texts.
+Finally, we use ee_utils_gif\_\* functions to render the GIF animation and add some texts.
+
 ```{r}
 
 animation <- ee_utils_gif_creator(rgbVis, gifParams, mode = "wb")
@@ -405,14 +400,11 @@ animation %>%
 
 ```
 
-
-
 ## 1.3. Masai Mara geometry
 
 Here, we will get the Masai Mara polygon, which will be use to extract the land cover, elevation, water, etc. for our used and available points in `RandomPointsCD_yearly_data`.
 
 Here, we’ll query the WDPA protected-areas layer in GEE and filter for "Masai Mara" to avoid manually drawing or copying coordinates.
-
 
 ```{r Masai Mara}
 # WDPA featurecollection (server-side)
@@ -424,12 +416,6 @@ mara_fc <- wdpa$filter(ee$Filter$stringContains('NAME', 'Masai Mara'))
 mara_geom <- mara_fc$geometry()   # keep geometry in EE
 ```
 
-
-
-
-
-
-
 # 2. Land cover (rgee)
 
 I will use the package rgee (Google Earth Engine for R), which was installed in section 1.
@@ -438,12 +424,7 @@ I will use the package rgee (Google Earth Engine for R), which was installed in 
 
 Now we extract the land cover. We will use the ESA WorldCover dataset, which is a 10m global land cover with 11 classes. It is supposedely great for small-scale features like our den locations. This is going to be for 2020 landcover.
 
-See: 
-- https://developers.google.com/earth-engine/datasets/catalog/ESA_WorldCover_v100?hl=fr
-- https://esa-worldcover.org/en
-- https://worldcover2020.esa.int/viewer
-- https://www.arcgis.com/home/item.html?id=e28b7e1da5414010ba4f47dd5a3c3ebb (for the classes code)
-
+See: - https://developers.google.com/earth-engine/datasets/catalog/ESA_WorldCover_v100?hl=fr - https://esa-worldcover.org/en - https://worldcover2020.esa.int/viewer - https://www.arcgis.com/home/item.html?id=e28b7e1da5414010ba4f47dd5a3c3ebb (for the classes code)
 
 ```{r}
 # Load land cover (WorldCover 10m)
@@ -463,8 +444,8 @@ MasaiMara_landcover_map
 htmlwidgets::saveWidget(MasaiMara_landcover_map, file = "Maps/MasaiMara_landcover_map.html", selfcontained = TRUE)
 ```
 
-
 Now we sample the landcover at our used and random points :
+
 ```{r}
 # Sample at your points (points_sf is your sf dataframe of den + available points)
 RandomPointsCD_year_data_ee <- sf_as_ee(RandomPointsCD_year_data)
@@ -495,7 +476,6 @@ RandomPointsCD_data <- RandomPointsCD_landcover |>
   select(-Map)
 
 ```
-
 
 ## 2.2. Map
 
@@ -546,9 +526,8 @@ htmlwidgets::saveWidget(CD_landcover_mapleaflet, file = "Maps/CD_landcover_maple
 
 ```
 
-
-
 ##### Overlay landcover with Den location:
+
 ```{r Masai Mara + CD Map}
 
 # Visualization parameters (classes + colors)
@@ -598,9 +577,6 @@ htmlwidgets::saveWidget(MasaiMara_CD_map, file = "Maps/MasaiMara_CD_map.html", s
 
 ```
 
-
-
-
 ## 2.3. Table
 
 ```{r}
@@ -620,18 +596,16 @@ save_as_html(landcover_tab_sum, path = "Tables/landcover_tab_sum.html")
 ```
 
 Save dataframe:
+
 ```{r}
 
 RandomPointsCD_data <- sf::st_write(RandomPointsCD_data, "data_files/RandomPointsCD_data.shp", delete_dsn = TRUE)
 
 ```
 
-
-
-
 ## 1.4. Elevation
 
-We will use the rgee package again to extrat elevation of the Masai Mara. The dataset is SRTM Digital Elevation (30 m). 
+We will use the rgee package again to extrat elevation of the Masai Mara. The dataset is SRTM Digital Elevation (30 m).
 
 We will use the `mara_geom` to extract the elevation just like I did with the land cover.
 
@@ -660,8 +634,7 @@ RandomPointsCD_data <- sampled_elevation_sf
 
 ```
 
-
-### 1.5.1. Map 
+### 1.5.1. Map
 
 ```{r}
 
@@ -681,7 +654,6 @@ Elevation_map
 #save
 htmlwidgets::saveWidget(Elevation_map, file = "Maps/Elevation_map.html", selfcontained = TRUE)
 ```
-
 
 ```{r}
 
@@ -709,8 +681,6 @@ CD_elevation_map
 htmlwidgets::saveWidget(CD_elevation_map, file = "Maps/CD_elevation_map.html", selfcontained = TRUE)
 ```
 
-
-
 ## 1.6. NDVI
 
 ```{r}
@@ -736,8 +706,6 @@ ndvi_map
 htmlwidgets::saveWidget(ndvi_map, file = "Maps/ndvi_map.html", selfcontained = TRUE)
 ```
 
-
-
 ```{r}
 
 # Convert your sf points to ee objects
@@ -755,13 +723,10 @@ sampled_ndvi_sf <- ee_as_sf(sampled_ndvi, maxFeatures = 20000)
 RandomPointsCD_data <- sampled_ndvi_sf
 ```
 
-
 ```{r}
 RandomPointsCD_data <- sf::st_write(RandomPointsCD_data, "data_files/RandomPointsCD_data.shp", delete_dsn = TRUE)
 
 ```
-
-
 
 ### 1.6.1. Map
 
@@ -790,7 +755,6 @@ CD_ndvi_map
 #save
 htmlwidgets::saveWidget(CD_ndvi_map, file = "Maps/CD_ndvi_map.html", selfcontained = TRUE)
 ```
-
 
 ## 3. Water
 
@@ -823,9 +787,8 @@ Map$addLayer(mara_fc, list(color = "blue"), "Masai Mara Boundary")
 # Add water polygons
 Map$addLayer(water_fc, list(color = "cyan"), "Water Polygons")
 ```
+
 Now, this gives me only the Mara River, not the Talek river. I need to find a way to get all the water sources, maybe even seasonnally? Like every month of the year or something? and also identify the areas that are marsh and use it too.
-
-
 
 ```{r}
 
@@ -843,6 +806,117 @@ View(sampled_dist_water_sf)
 RandomPointsCD_data <- sampled_dist_water_sf
 
 ```
+
+
+The first thing is to tell R to use python to be able to get the 20+ year historical satellite imagery data from Google Earth Engine, since it is the easiest way to get the Talek town borders for all those years. That API (Application Programming Interface) is only available in Python or JavaScript. So I have to tell R to use Python to have access to that. --\> An API is like a menu at a restaurant - it lists the things you can ask for (functions, data) and tells the kitchen (the software) how to prepare them for you. --\> Google Earth Engine API = the set of commands you can send to Google's satellite image servers to request data (e.g., "give me all Landsat images for Talek Town in 2005").
+
+```{r}
+# 1. Location of Talek town, Maasai Mara
+talek_point <- ee$Geometry$Point(35.216423, -1.442912) #talek town center
+talek_roi <- talek_point$buffer(600) # 5 km radius
+```
+
+Here is a test for year 2020:
+
+```{r}
+# 2 - Function for built-up detection
+get_yearly_builtup <- function(year) {
+  s2 <- ee$ImageCollection("COPERNICUS/S2_SR")$
+    filterBounds(talek_roi)$
+    filterDate(sprintf("%d-01-01", year), sprintf("%d-12-31", year))$
+    filter(ee$Filter$lt("CLOUDY_PIXEL_PERCENTAGE", 20))$
+    median()
+  
+  # Calculate NDBI (built-up) and NDVI (vegetation)
+  ndbi <- s2$normalizedDifference(c("B11", "B8"))
+  ndvi <- s2$normalizedDifference(c("B8", "B4"))
+  
+  # Threshold: built-up AND low vegetation
+  builtup_mask <- ndbi$gt(0.2)$And(ndvi$lt(0.3))
+  
+  # Mask original image
+  builtup <- builtup_mask$selfMask()
+  
+  # Reduce to vectors inside ROI
+  vectors <- builtup$reduceToVectors(
+    geometry = talek_roi,
+    geometryType = "polygon",
+    reducer = ee$Reducer$countEvery(),
+    scale = 10,
+    maxPixels = 1e10
+  )
+  
+  vectors$set("year", year)
+}
+
+# --- Year of interest ---
+year <- 2020
+
+# --- Generate polygons for that year ---
+builtup_polygons <- get_yearly_builtup(year)
+
+# --- Visualization parameters ---
+Map$centerObject(talek_roi, zoom = 15)
+Map$addLayer(talek_roi, list(color = "blue"), "Talek ROI") +
+  Map$addLayer(builtup_polygons, list(color = "red"), paste("Built-up", year))
+
+
+```
+
+```{r}
+# 2. Function to mask clouds and detect buildings
+mask_builtup <- function(image) {
+  # Calculate NDBI
+  swir <- image$select("B11")
+  nir <- image$select("B8")
+  ndbi <- swir$subtract(nir)$divide(swir$add(nir))
+  
+  # Built-up mask (adjust threshold if needed)
+  builtup_mask <- ndbi$gt(0.2) # try lowering to 0.1 if empty
+  
+  # Apply mask but keep it as a single-band image for vectorizing
+  return(builtup_mask$rename("builtup"))
+}
+
+# 3. Function to get yearly composite and vector polygons
+get_yearly_builtup <- function(year) {
+  start <- sprintf("%d-01-01", year)
+  end <- sprintf("%d-12-31", year)
+  
+  yearly_img <- ee$ImageCollection("COPERNICUS/S2_SR")$
+    filterBounds(region)$
+    filterDate(start, end)$
+    map(mask_builtup)$
+    max() # union of all built-up pixels in the year
+  
+  # Ensure projection
+  yearly_img <- yearly_img$setDefaultProjection("EPSG:4326", NULL, 10)
+  
+  # Vectorize built-up areas
+  vectors <- yearly_img$reduceToVectors(
+    geometry = region,
+    geometryType = "polygon",
+    scale = 10,
+    crs = "EPSG:4326",
+    maxPixels = 1e10
+  )
+  
+  vectors_sf <- ee_as_sf(vectors)
+  vectors_sf$year <- year
+  return(vectors_sf)
+}
+
+# 4. Run for a range of years
+years <- 2021:2023
+builtup_polygons <- do.call(rbind, lapply(years, get_yearly_builtup))
+
+# 5. Save shapefile
+st_write(builtup_polygons, "talek_builtup_yearly.shp", delete_dsn = TRUE)
+```
+
+
+
+
 
 
 

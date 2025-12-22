@@ -83,6 +83,35 @@ RandomPointsCD_year_data <- sf::st_read("data_files/RandomPointsCD_year_data.shp
 
 
 
+## 0.1. Visualization
+
+```{r}
+
+RandomPointsCD_mapleaflet <- leaflet() |> 
+  addTiles() |>
+
+  # Then plot random (case_ == 0) in blue (will appear on top)
+  addCircleMarkers(
+    data = RandomPointsCD_year_data[RandomPointsCD_year_data$case == 0, ],
+    color = "blue", radius = 1, fillOpacity = 0.8,
+    group = "Random"
+  ) |>
+   # First plot used (case_ == 1) in red
+  addCircleMarkers(
+    data = RandomPointsCD_year_data[RandomPointsCD_year_data$case == 1, ],
+    color = "red", radius = 1, fillOpacity = 0.8,
+    group = "Used"
+  ) |>
+  addLayersControl(
+    overlayGroups = c("Used", "Random"),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+
+RandomPointsCD_mapleaflet
+
+```
+
+
 
 # 1. Covariables 
 
@@ -411,128 +440,7 @@ I want to calculate the distance from the den location points to the closest lio
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 ## 1.2. Distance to Talek
-
-The first thing is to tell R to use python to be able to get the 20+ year historical satellite imagery data from Google Earth Engine, since it is the easiest way to get the Talek town borders for all those years. That API (Application Programming Interface) is only available in Python or JavaScript. So I have to tell R to use Python to have access to that. --\> An API is like a menu at a restaurant - it lists the things you can ask for (functions, data) and tells the kitchen (the software) how to prepare them for you. --\> Google Earth Engine API = the set of commands you can send to Google's satellite image servers to request data (e.g., "give me all Landsat images for Talek Town in 2005").
-
-```{r}
-# 1. Location of Talek town, Maasai Mara
-talek_point <- ee$Geometry$Point(35.216423, -1.442912) #talek town center
-talek_roi <- talek_point$buffer(600) # 5 km radius
-```
-
-Here is a test for year 2020:
-
-```{r}
-# 2 - Function for built-up detection
-get_yearly_builtup <- function(year) {
-  s2 <- ee$ImageCollection("COPERNICUS/S2_SR")$
-    filterBounds(talek_roi)$
-    filterDate(sprintf("%d-01-01", year), sprintf("%d-12-31", year))$
-    filter(ee$Filter$lt("CLOUDY_PIXEL_PERCENTAGE", 20))$
-    median()
-  
-  # Calculate NDBI (built-up) and NDVI (vegetation)
-  ndbi <- s2$normalizedDifference(c("B11", "B8"))
-  ndvi <- s2$normalizedDifference(c("B8", "B4"))
-  
-  # Threshold: built-up AND low vegetation
-  builtup_mask <- ndbi$gt(0.2)$And(ndvi$lt(0.3))
-  
-  # Mask original image
-  builtup <- builtup_mask$selfMask()
-  
-  # Reduce to vectors inside ROI
-  vectors <- builtup$reduceToVectors(
-    geometry = talek_roi,
-    geometryType = "polygon",
-    reducer = ee$Reducer$countEvery(),
-    scale = 10,
-    maxPixels = 1e10
-  )
-  
-  vectors$set("year", year)
-}
-
-# --- Year of interest ---
-year <- 2020
-
-# --- Generate polygons for that year ---
-builtup_polygons <- get_yearly_builtup(year)
-
-# --- Visualization parameters ---
-Map$centerObject(talek_roi, zoom = 15)
-Map$addLayer(talek_roi, list(color = "blue"), "Talek ROI") +
-  Map$addLayer(builtup_polygons, list(color = "red"), paste("Built-up", year))
-
-
-```
-
-```{r}
-# 2. Function to mask clouds and detect buildings
-mask_builtup <- function(image) {
-  # Calculate NDBI
-  swir <- image$select("B11")
-  nir <- image$select("B8")
-  ndbi <- swir$subtract(nir)$divide(swir$add(nir))
-  
-  # Built-up mask (adjust threshold if needed)
-  builtup_mask <- ndbi$gt(0.2) # try lowering to 0.1 if empty
-  
-  # Apply mask but keep it as a single-band image for vectorizing
-  return(builtup_mask$rename("builtup"))
-}
-
-# 3. Function to get yearly composite and vector polygons
-get_yearly_builtup <- function(year) {
-  start <- sprintf("%d-01-01", year)
-  end <- sprintf("%d-12-31", year)
-  
-  yearly_img <- ee$ImageCollection("COPERNICUS/S2_SR")$
-    filterBounds(region)$
-    filterDate(start, end)$
-    map(mask_builtup)$
-    max() # union of all built-up pixels in the year
-  
-  # Ensure projection
-  yearly_img <- yearly_img$setDefaultProjection("EPSG:4326", NULL, 10)
-  
-  # Vectorize built-up areas
-  vectors <- yearly_img$reduceToVectors(
-    geometry = region,
-    geometryType = "polygon",
-    scale = 10,
-    crs = "EPSG:4326",
-    maxPixels = 1e10
-  )
-  
-  vectors_sf <- ee_as_sf(vectors)
-  vectors_sf$year <- year
-  return(vectors_sf)
-}
-
-# 4. Run for a range of years
-years <- 2021:2023
-builtup_polygons <- do.call(rbind, lapply(years, get_yearly_builtup))
-
-# 5. Save shapefile
-st_write(builtup_polygons, "talek_builtup_yearly.shp", delete_dsn = TRUE)
-```
-
-### 1.2.1. Calculation
 
 ```{r}
 
@@ -554,7 +462,6 @@ RandomPointsCD_year_data$dst_tl <- as.numeric(st_distance(RandomPointsCD_year_da
 
 
 ```
-
 
 
 ## 1.3. Land cover (LULC)
@@ -641,10 +548,16 @@ pal_LULC <- colorNumeric(palette = terrain.colors(20),
                     na.color = "transparent")
 
 
+# keeping only the used points
+CD_landcover <- RandomPointsCD_data |>
+  filter(case == 1)
+
+
 Mara_LULC_CD_leaflet <- leaflet() |>
   addTiles() |>
   addRasterImage(Mara_LULC_wgs84_small, colors = pal_LULC, opacity = 0.6) |>
   addCircleMarkers(data = CD_landcover,
+                   color = "red",
                    radius = 2, stroke = FALSE, fillOpacity = 0.9,
                    popup = ~paste("Clan:", clan, "<br>", 
                                   "LC:", landcover, "<br>",
@@ -667,8 +580,16 @@ htmlwidgets::saveWidget(Mara_LULC_CD_leaflet, file = "Maps/Mara_LULC_CD_leaflet.
 Mara_LULC_CDRandom_leaflet <- leaflet() |>
   addTiles() |>
   addRasterImage(Mara_LULC_wgs84_small, colors = pal_LULC, opacity = 0.6) |>
-  addCircleMarkers(data = RandomPointsCD_data,
-                   color = ~ifelse(case=="1", "red", "blue"),
+  #random points first 
+  addCircleMarkers(data = subset(RandomPointsCD_data, case == "0"),
+                   color = "blue",
+                   radius = 2, stroke = FALSE, fillOpacity = 0.9,
+                   popup = ~paste("Clan:", clan, "<br>", 
+                                  "LC:", landcover, "<br>",
+                                  "Landmark:", lndmrk_))  |>
+  # used points after so they are on top
+  addCircleMarkers(data = subset(RandomPointsCD_data, case == "1"),
+                   color = "red",
                    radius = 2, stroke = FALSE, fillOpacity = 0.9,
                    popup = ~paste("Clan:", clan, "<br>", 
                                   "LC:", landcover, "<br>",
@@ -691,12 +612,17 @@ htmlwidgets::saveWidget(Mara_LULC_CDRandom_leaflet, file = "Maps/Mara_LULC_CDRan
 
 To get the distance to the closest water source, here are the steps we need to do :
 
-1. Identify water sources in the Masai Mara (type 17 of LULC is water.
+1. Identify water sources in the Masai Mara (type 17 of LULC is water) --> I need to extract class == 17 to create a water raster.
 2. Convert that into a raster mask (water = 1, non-water = 0).
 3. Compute distance to nearest water pixel.
 4. Sample that distance at your points.
 
 
+```{r}
+# create binary water raster (1 = water, NA = non-water)
+water_rast <- Mara_LULC == 17
+
+```
 
 
 
