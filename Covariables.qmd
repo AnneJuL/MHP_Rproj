@@ -717,7 +717,6 @@ RandomPointsCD_data$dist_water_m <- terra::extract(
   vect(RandomPointsCD_data_water)
 )[,2]
 
-
 ```
 
 
@@ -725,12 +724,42 @@ RandomPointsCD_data$dist_water_m <- terra::extract(
 
 ## 1.5. Distance from edge of the territory
 
+1. Same as with water, we want to create a binary raster for the reserve.
 
 ```{r}
+reserve_rast <- ifel(!is.na(Mara_LULC), 1, NA)
 
+plot(reserve_rast)
+```
+
+2. extract the border pixels
+
+```{r}
+# Identify reserve boundary
+reserve_border <- boundaries(reserve_rast)
+
+# now invert: only border = 1, interior = NA
+reserve_border[reserve_border == 0] <- NA
+
+#visualize
+plot(reserve_border)
+```
+
+3. compute distance to border
+```{r}
+dist_to_border <- distance(reserve_border)
+
+plot(dist_to_border) #works!
 ```
 
 
+4. calculate distances from border for each used/available points
+```{r}
+points_border <- st_transform(RandomPointsCD_data, crs(dist_to_border))
+
+RandomPointsCD_data$dist_border_m <- terra::extract(dist_to_border, vect(points_border))[,2]
+
+```
 
 
 
