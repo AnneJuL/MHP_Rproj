@@ -551,7 +551,7 @@ CD_points <- RandomPointsCD_data |>
   filter(case == "1")
 
 test_map <- CD_points |>
-  filter(session == "s11515")
+  filter(session == "t37451")
 
 mapview(test_map)
 
@@ -764,6 +764,8 @@ RandomPointsCD_data$dist_border_m <- terra::extract(dist_to_border, vect(points_
 
 
 ## 1.6. Distance to roads
+
+Will do the same thing as the water and border of territory, but here, I will need to first find a raster or something that has the roads pixels and stuff. 
 
 ```{r}
 
