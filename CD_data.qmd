@@ -257,6 +257,7 @@ Here we keep only the den sessions. Will do that with tblSessions
 
 CD_Sess <- tblSessions |>   # 26911
   select(session, location, date) |>
+  #Here there are session that are marked as a communal den session even though it's not at a cd, will have to fix that with tblLandmarks
   filter(location == "d") |>
   filter(!grepl("-mr", session)) |>
   filter(!grepl("-ft", session)) |>
@@ -409,8 +410,15 @@ Joining utme and utmn columns:
 
 ```{r}
 HyenasLocPerSession_CD_coord <- HyenasLocPerSession_CD_clean |>
-left_join(Landmarks %>% select(landmark_id, utme, utmn),
+left_join(Landmarks %>% select(landmark_id, utme, utmn, category),
             by = "landmark_id", relationship = "many-to-many")
+
+
+#now here I keep only the landmarks that are cd or d:
+HyenasLocPerSession_CD_coord <- HyenasLocPerSession_CD_coord |>
+  subset(category == "cd" | category == "d")
+#119205 obs
+
 ```
 
 #### 1.3.1. Cleaning coordinates
@@ -505,16 +513,16 @@ ActiveCD_data <- ActiveCD_PerHyenas_data |>
 
 
 length(unique(ActiveCD_data$landmark_id))
-#355 dens!!
+#334 dens!!
 ```
 
 ### 1.4.2. Active CD year
 
 ```{r}
 ActiveCD_year <- ActiveCD_data |>
-  select(-month, -day, -dob, -dengrad) |>
+  select(-day, -dob, -dengrad) |>
   distinct(landmark_id, year, .keep_all = T)
-# 628 dens used in total 
+# 600 dens used in total 
 ```
 
 ### 1.4.3. Active CD unique
@@ -523,7 +531,7 @@ ActiveCD_year <- ActiveCD_data |>
 ActiveCD_unique <- ActiveCD_data |>
   select(-date, -year, -month, -day) |>
   distinct(landmark_id, .keep_all = T)
-#355 dens in total (no reuse)
+#334 dens in total (no reuse)
 ```
 
 ## 1.5. All GPS locations
@@ -642,7 +650,7 @@ DB_session_hyenasID <- DB_session_hyenasID |>
 
 ```
 
-I have more lines in DB_session_hyenasID (122558) than in DB_hyenas_clan (128 324). The difference is 5766. Let's see what are the differences:
+I have less lines in DB_session_hyenasID (122 558) than in DB_hyenas_clan (128 324). The difference is 5766. Let's see what are the differences:
 
 ```{r}
 
@@ -676,7 +684,7 @@ common_rows <- DB_session_hyenasID %>%
 
 ```
 
-Now that we have the sessions with all the hyenas that were seen in each of our 3 territories, we want to add the GPS location of those sessions. We will use tblLocationsPerSession.
+Now that we have the sessions with all the hyenas that were seen in each of our 4 territories, we want to add the GPS location of those sessions. We will use tblLocationsPerSession.
 
 ```{r Adding GPS location}
 
@@ -1024,6 +1032,9 @@ DB_AllGPS_sf_clean <- DB_locations_for_MCPs_sf |>
 DB_AllGPS <- DB_locations_for_MCPs_clean |>
   select(-hyenas) |>
   filter(!session %in% c("t120888", "s58", "t55969", "t112359", "s6974", "s115706", "s117340"))
+
+# NOw we visualize again
+mapview(DB_AllGPS_sf_clean, xcol = "utme", ycol = "utmn")
   
   
 ```
@@ -1186,12 +1197,16 @@ Mapview is just to see real quick what the points look like.
 ```{r Mapviews}
 
 #According to year
-clan_yearly_CD_mapview <- mapview(CD_sf, xcol = "utme", ycol = "utmn", zcol = "year")
+clan_yearly_CD_mapview <- mapview(ActiveCD_sf, xcol = "utme", ycol = "utmn", zcol = "year")
+clan_yearly_CD_mapview
+
 htmlwidgets::saveWidget(clan_yearly_CD_mapview@map, "Maps/clan_yearly_CD_mapview.html", selfcontained = TRUE)
 
 
 # According to clan 
-clan_CD_mapview <- mapview(CD_sf, xcol = "utme", ycol = "utmn", zcol = "clan")
+clan_CD_mapview <- mapview(ActiveCD_sf, xcol = "utme", ycol = "utmn", zcol = "clan")
+clan_CD_mapview
+
 htmlwidgets::saveWidget(clan_CD_mapview@map, file = "Maps/clan_CD_mapview.html", selfcontained = TRUE)
 
 
@@ -1205,16 +1220,16 @@ We will create a basemap for starter: - Leaflet tile : draws the map tiles. Ther
 
 ```{r Leaflet per year}
 
-pal <- colorFactor(palette = "viridis", domain = CD_sf_wgs84$clan)
+pal <- colorFactor(palette = "viridis", domain = ActiveCD_wgs84$clan)
 
 CD_peryear_mapleaflet <- leaflet() |>
   addTiles()
 
 # Add points grouped by Year, colored by Clan
-years <- unique(CD_sf_wgs84$year)
+years <- unique(ActiveCD_wgs84$year)
 
 for (yr in years) {
-  data_year <- CD_sf_wgs84 |> filter(year == yr)
+  data_year <- ActiveCD_wgs84 |> filter(year == yr)
   
 CD_peryear_mapleaflet <- CD_peryear_mapleaflet |>
     addCircleMarkers(data = data_year,
@@ -1237,7 +1252,7 @@ CD_peryear_mapleaflet <- CD_peryear_mapleaflet |>
   addScaleBar(position = "bottomleft", options = list(metric = TRUE, imperial = FALSE)) |>
   
   #Add a legend
-  addLegend("bottomright", pal = pal, values = CD_sf_wgs84$clan,
+  addLegend("bottomright", pal = pal, values = ActiveCD_wgs84$clan,
             title = "Clan", opacity = 1)
   
 
@@ -1262,16 +1277,16 @@ This is the same map, but we invert the clan and year variables
 
 ```{r Leaflet per clan}
 
-pal_year <- colorFactor(palette = "viridis", domain = CD_sf_wgs84$year)
+pal_year <- colorFactor(palette = "viridis", domain = ActiveCD_wgs84$year)
 
 CD_perclan_mapleaflet <- leaflet() |>
   addTiles()
 
 # Add points grouped by Year, colored by Clan
-clans <- unique(CD_sf_wgs84$clan)
+clans <- unique(ActiveCD_wgs84$clan)
 
 for (cl in clans) {
-  data_clan <- CD_sf_wgs84 |> filter(clan == cl)
+  data_clan <- ActiveCD_wgs84 |> filter(clan == cl)
   
 CD_perclan_mapleaflet <- CD_perclan_mapleaflet |>
     addCircleMarkers(data = data_clan,
@@ -1296,7 +1311,7 @@ CD_perclan_mapleaflet <- CD_perclan_mapleaflet |>
   addScaleBar(position = "bottomleft", options = list(metric = TRUE, imperial = FALSE)) |>
   
   #Add a legend
-  addLegend("bottomright", pal = pal_year, values = CD_sf_wgs84$year,
+  addLegend("bottomright", pal = pal_year, values = ActiveCD_wgs84$year,
             title = "Year", opacity = 1)
   
 
@@ -1461,57 +1476,8 @@ htmlwidgets::saveWidget(AllGPS_location_perclan_mapleaflet, file = "Maps/AllGPS_
 
 ```
 
-### vi) Monthly CD
 
-```{r}
-
-pal <- colorFactor(palette = "viridis", domain = CD_monthly_wgs84$clan)
-
-CD_monthlyPerYear_mapleaflet <- leaflet() |>
-  addTiles()
-
-# Add points grouped by Year, colored by Clan
-years <- unique(CD_monthly_wgs84$year)
-
-for (yr in years) {
-  data_year <- CD_monthly_wgs84 |> filter(year == yr)
-  
-CD_monthlyPerYear_mapleaflet <- CD_monthlyPerYear_mapleaflet |>
-    addCircleMarkers(data = data_year,
-                     color = ~pal(clan),
-                     group = yr,
-                     radius = 3,
-                     fillOpacity = 0.8,
-                     popup = ~paste("Year:", year, "<br>", "Clan:", clan))
-}
-
-#Add toggle control for years
-CD_monthlyPerYear_mapleaflet <- CD_monthlyPerYear_mapleaflet |>
-  
-  addLayersControl(
-    baseGroups = years,
-    overlayGroups = c("Year"),
-    options = layersControlOptions(collapsed = FALSE)
-  ) |>
-  
-  addScaleBar(position = "bottomleft", options = list(metric = TRUE, imperial = FALSE)) |>
-  
-  #Add a legend
-  addLegend("bottomright", pal = pal, values = CD_monthly_wgs84$clan,
-            title = "Clan", opacity = 1)
-  
-
-CD_monthlyPerYear_mapleaflet  # display the map
-
-
-```
-
-```{r}
-#save
-htmlwidgets::saveWidget(CD_monthlyPerYear_mapleaflet, file = "Maps/CD_monthlyPerYear_mapleaflet.html", selfcontained = TRUE)
-```
-
-### vii) Active CD
+### vi) Active CD
 
 with active CD dataframe:
 
@@ -1563,6 +1529,8 @@ ActiveCD_monthlyPerYear_mapleaflet  # display the map
 htmlwidgets::saveWidget(ActiveCD_monthlyPerYear_mapleaflet, file = "Maps/ActiveCD_monthlyPerYear_mapleaflet.html", selfcontained = TRUE)
 ```
 
+
+
 ## 3.2. Tables
 
 Calculate the sum of CD per year and clan.
@@ -1573,11 +1541,18 @@ Calculate the sum of CD per year and clan.
 ActiveCD_data$year <- as.character(ActiveCD_data$year)
 
 ActiveCD_data_tab <- ActiveCD_data |>
+  group_by(year, month, clan, landmark_id) |>
+  distinct(year, month, landmark_id) |>
+  ungroup() |>
+  select(-landmark_id) |>
   group_by(year, month, clan) |>
   summarise(CD_num = n()) |>
   arrange(year, month, clan)
 
 ActiveCD_data_tab
+
+write_csv2(ActiveCD_data_tab, "Tables/ActiveCD_data_tab.csv")
+
 ```
 
 ```{r}
@@ -1828,11 +1803,26 @@ Great, now that we have our 95% MCPs based on all GPS points of the hyenas and t
 
 ```{r presence track}
 #Convert your sf object to a data frame with coordinates: 
-ActiveCD_wgs84_df <- ActiveCD_wgs84 |> 
+ActiveCD_year_wgs84_df <- ActiveCD_year_wgs84 |> 
   mutate(long = sf::st_coordinates(geometry)[,1], lat = sf::st_coordinates(geometry)[,2]) 
 
-#Change the CD_sf_wgs84_df into a track_xy object 
-presence_track <- make_track(ActiveCD_wgs84_df, long, lat, crs = 4326, clan = clan, year = year, landmark_id = landmark_id, month = month, session = session)
+#Change the ActiveCD_wgs84_df into a track_xy object 
+presence_track <- make_track(
+  ActiveCD_year_wgs84_df, 
+  long,
+  lat,
+  crs = 4326,
+  clan = clan,
+  year = year,
+  landmark_id = landmark_id,
+  month = month, 
+  session = session)
+
+
+#I will also create the presence track as an sf pbject to bind rows later:
+presence_sf <- presence_track |>
+  st_as_sf(coords = c("x_", "y_"), crs = st_crs(mcp95_clan_year_sf)) |>
+  mutate(case_ = 1)
 ```
 
 ### 4.2.1. General MCP
@@ -1879,9 +1869,7 @@ RandomPointsCD_data <- map_dfr(
 
 # Combine used and random points
 RandomPointsCD_data <- bind_rows(
-  presence_track |>
-    select(-x_, -y_) |>
-    mutate(case_ = 1),
+  presence_sf,
   RandomPointsCD_data)
 
 # Clean up naming
@@ -1920,14 +1908,17 @@ generate_randoms <- function(pres_row, mcp_polygons, n = 10) {
   # Sample n random points inside this year's MCP
   rand_geom <- st_sample(mcp_i, size = n, exact = TRUE)
   
+  # IMPORTANT: ensure correct length
+  if (length(rand_geom) != n) return(NULL)
+  
   # Wrap sampled points into an sf object with metadata
   rand_sf <- st_sf(
-    clan        = clan_i,
-    year        = year_i,
-    month       = month_i,
-    session     = session_i,
-    landmark_id = landmark_id_i,
-    case_       = 0,                 # available points
+    clan        = rep(clan_i, n),
+    year        = rep(year_i, n),
+    month       = rep(month_i, n),
+    session     = rep(session_i, n),
+    landmark_id = rep(landmark_id_i, n),
+    case_       = rep(0, n),
     geometry    = rand_geom,
     crs         = st_crs(mcp_polygons)
   )
@@ -1944,24 +1935,25 @@ RandomPointsCD_yearly_data <- map_dfr(
   1:nrow(presence_track),
   ~ generate_randoms(presence_track[.x, ], mcp95_clan_year_sf, n = 10))
 
+
 # Combine used and random points
-RandomPointsCD_yearly_data <- bind_rows(
-  presence_track |>
-    select(-x_, -y_) |>
-    mutate(case_ = 1),
+RandomPointsCD_year_data <- bind_rows(
+  presence_sf, 
   RandomPointsCD_yearly_data)
 
 # Clean up naming
-RandomPointsCD_yearly_data <- RandomPointsCD_yearly_data |>
+RandomPointsCD_year_data <- RandomPointsCD_year_data |>
   rename(case = case_)
 
-
+#verify that I have the right numbers of case=1 (592)
+table(RandomPointsCD_year_data$case)
+# there is 1 point that has no random points with it
 
 ```
 
 ```{r Save}
 
-RandomPointsCD_yearly_data <- sf::st_write(RandomPointsCD_yearly_data, "data_files/RandomPointsCD_year_data.shp", delete_dsn = T)
+RandomPointsCD_year_data <- sf::st_write(RandomPointsCD_year_data, "data_files/RandomPointsCD_year_data.shp", delete_dsn = T)
 
 ```
 
@@ -1976,13 +1968,13 @@ RandomPointsCD_mapleaflet <- leaflet() |>
 
   # Then plot random (case_ == 0) in blue (will appear on top)
   addCircleMarkers(
-    data = RandomPointsCD_yearly_data[RandomPointsCD_yearly_data$case == 0, ],
+    data = RandomPointsCD_year_data[RandomPointsCD_year_data$case == 0, ],
     color = "blue", radius = 1, fillOpacity = 0.8,
     group = "Random"
   ) |>
    # First plot used (case_ == 1) in red
   addCircleMarkers(
-    data = RandomPointsCD_yearly_data[RandomPointsCD_yearly_data$case == 1, ],
+    data = RandomPointsCD_year_data[RandomPointsCD_year_data$case == 1, ],
     color = "red", radius = 1, fillOpacity = 0.8,
     group = "Used"
   ) |>

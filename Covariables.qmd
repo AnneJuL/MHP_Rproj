@@ -527,15 +527,20 @@ RandomPointsCD_data <- RandomPointsCD_year_data |>
     `20` = "Wet_meadow"))
 
 RandomPointsCD_data <- RandomPointsCD_data |>
+  #these two seem like outliers (banana T den):
   filter(session != "t60535") |>
   filter(session != "t60367") |>
-  filter(lndmrk_ != "Rocky_Spot")
+  #this landmark looks like an outlier
+  filter(lndmrk_ != "Rocky_Spot") |>
+  #change lighthouse_D for serena S instead of serena N
+  mutate(clan = ifelse(lndmrk_ == "Lighthouse_Den", "serenas", clan))
 
 # is there any lndmrk without den in the name: 
 RandomPointsCD_data_dens <- RandomPointsCD_data |>
  filter(!grepl("den|_D\\b", lndmrk_, ignore.case = TRUE))
 
-
+# I changed that in CD_data and kept only the landmarks with a category of cd or d
+# should be 0 now
 
 ```
 
@@ -546,7 +551,7 @@ CD_points <- RandomPointsCD_data |>
   filter(case == "1")
 
 test_map <- CD_points |>
-  filter(session == "s11535")
+  filter(session == "s11515")
 
 mapview(test_map)
 
@@ -556,7 +561,7 @@ Verify landmarks
 ```{r}
 
 landmark <- tblLandmarks |>
-  filter(landmark_id == "Mr. Cluck's Chicken Shack Den")
+  filter(landmark_id == "Mr. Cluck's Chicken Shack Den") # this one is a natal den (nd) so it is not in my database
 
 landmark_sf <- st_as_sf(landmark, coords = c("utme", "utmn"), crs = 32736)
 
@@ -664,7 +669,7 @@ RandomPointsCD_data <- RandomPointsCD_data |>
 
 
 RandomPointsCD_data_landcoverOutside <- RandomPointsCD_data |>
-  filter(landcover == "outside")
+  filter(landcover == "outside") #297
 mapview(RandomPointsCD_data_landcoverOutside)
 
 
