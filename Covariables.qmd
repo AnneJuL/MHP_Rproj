@@ -689,7 +689,7 @@ To get the distance to the closest water source, here are the steps we need to d
 
 ```{r}
 # create binary water raster (1 = water, NA = non-water)
-water_rast <- Mara_LULC == 17
+water_rast <- ifel(Mara_LULC == 17, 1, NA)
 
 # map:
 plot(water_rast)
@@ -709,12 +709,12 @@ plot(dist_to_water)
 Calculating distance from water for each used and available points:
 ```{r}
 
-RandomPointsCD_data <- st_transform(RandomPointsCD_data, crs(dist_to_water))
+RandomPointsCD_data_water <- st_transform(RandomPointsCD_data, crs(dist_to_water))
 
 # extract distance
 RandomPointsCD_data$dist_water_m <- terra::extract(
   dist_to_water,
-  vect(RandomPointsCD_data)
+  vect(RandomPointsCD_data_water)
 )[,2]
 
 
