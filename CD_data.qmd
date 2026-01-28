@@ -507,7 +507,7 @@ ActiveCD_PerHyenas_data <- HyenasLocPerSession_CD_coord_clean |>
 
 
 ActiveCD_data <- ActiveCD_PerHyenas_data |>
-  select(-id) |>
+  select(-id, -dob, -dengrad) |>
   distinct(session, .keep_all = T)
 
 
@@ -520,8 +520,8 @@ length(unique(ActiveCD_data$landmark_id))
 
 ```{r}
 ActiveCD_year <- ActiveCD_data |>
-  select(-day, -dob, -dengrad) |>
-  distinct(landmark_id, year, .keep_all = T)
+  select(-day) |>
+  distinct(landmark_id, year, month, .keep_all = T)
 # 600 dens used in total 
 ```
 
@@ -1069,9 +1069,6 @@ Hyena data for CD sessions:
 #For fiona:
 write_csv2(ActiveCD_PerHyenas_data, "data_files/ActiveCD_PerHyenas_data.csv") #active CD with a hyena id column
 
-write_csv2(ActiveCD_year, "data_files/ActiveCD_year.csv") #All CD used in one year (no month, no hyena id)
-write_csv2(ActiveCD_unique, "data_files/ActiveCD_unique.csv") #the 355 unique den locations
-
 ```
 
 ## 2.2. Shapefiles
@@ -1102,7 +1099,7 @@ ActiveCD_sf <- ActiveCD_sf |>
   filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
 
 #Save the sf dataframe - can only do it once when it is not created before
-ActiveCD_sf <- sf::st_write(ActiveCD_sf, "data_files/ActiveCD_sff.shp", delete_dsn = TRUE)
+ActiveCD_sf <- sf::st_write(ActiveCD_sf, "data_files/ActiveCD_sf.shp", delete_dsn = TRUE)
 
 ```
 
@@ -1535,7 +1532,7 @@ htmlwidgets::saveWidget(ActiveCD_monthlyPerYear_mapleaflet, file = "Maps/ActiveC
 
 Calculate the sum of CD per year and clan.
 
-### iii) ActiveCD_data
+### i) ActiveCD_data
 
 ```{r}
 ActiveCD_data$year <- as.character(ActiveCD_data$year)
