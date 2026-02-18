@@ -52,7 +52,7 @@ library(leaflet.extras)
 library(amt)
 
 
-#from Guélat
+#from Guï¿½lat
 library(leaflet.extras2)
 library(terra) #to work with raster data
 library(lwgeom)
@@ -1473,7 +1473,6 @@ htmlwidgets::saveWidget(AllGPS_location_perclan_mapleaflet, file = "Maps/AllGPS_
 
 ```
 
-
 ### vi) Active CD
 
 with active CD dataframe:
@@ -1525,8 +1524,6 @@ ActiveCD_monthlyPerYear_mapleaflet  # display the map
 #save
 htmlwidgets::saveWidget(ActiveCD_monthlyPerYear_mapleaflet, file = "Maps/ActiveCD_monthlyPerYear_mapleaflet.html", selfcontained = TRUE)
 ```
-
-
 
 ## 3.2. Tables
 
