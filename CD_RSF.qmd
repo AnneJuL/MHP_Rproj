@@ -10,6 +10,8 @@ editor_options:
 
 Load packages
 
+git config --global user.email "anne.ju.laberge@usherbrooke.ca"
+
 ```{r Packages}
 
 # for data manipulations
