@@ -4,7 +4,7 @@ editor_options:
   chunk_output_type: console
 ---
 
-# Creating the covariables 
+# Creating the covariables
 
 # 0. Libraries et al.
 
@@ -74,14 +74,11 @@ load_all_tables()
 
 ```
 
-
 ```{r Load dataframe}
 
 RandomPointsCD_year_data <- sf::st_read("data_files/RandomPointsCD_year_data.shp")
 
 ```
-
-
 
 ## 0.1. Visualization
 
@@ -111,9 +108,7 @@ RandomPointsCD_mapleaflet
 
 ```
 
-
-
-# 1. Covariables 
+# 1. Covariables
 
 Now we need to create covariables to put in the RSF models. Those will be our potential drivers for communal den locations.
 
@@ -133,17 +128,14 @@ We have a lot of covariables to create. Here is the list:
 
 -   Distance to water\*
 
-
 In more of a post-hoc thing: - Number of cubs at dens
-
-
 
 ## 1.1. Lions
 
 This variable is gonna be distance to the closest lion sighting, and/or it will be the number of sightings in the territory per year.
 
- - Number of lions/sightings
- - Distance from the closest sighting
+-   Number of lions/sightings
+-   Distance from the closest sighting
 
 To do so, I will use the dataframe "tblPredatorsPerSession".
 
@@ -171,7 +163,6 @@ DF_lndmk <- tblLandmarks |>
   filter(!(landmark_id == "Marsh_Den" & (is.na(utme) | is.na(utmn))))
 
 ```
-
 
 I also need to join the session ID to the location landmark dataframe.
 
@@ -234,7 +225,6 @@ DF_lions_data <- DF_lions_clans |>
   drop_na(utmn) # get rid of NAs for utmn column
 ```
 
-
 ### 1.1.1. Cleaning
 
 ```{r Cleaning}
@@ -272,23 +262,9 @@ DF_lions_data_clean <- DF_lions_data_clean |>
 
 ```
 
+I got some num of individual that are 0 : s114919 --\> change to num = 2 t61954 --\> change to 1 t67315 --\> change to 1 t77054 --\> will put 1
 
-I got some num of individual that are 0 :
-s114919 --> change to num = 2
-t61954 --> change to 1
-t67315 --> change to 1
-t77054 --> will put 1
-
-remove (they all have 0 as a number of lions -- maybe we will keep them eventually ?)
-s165
-t101874.10
-t1475.4
-t53055
-t57427
-t60317
-t62190
-t75009
-t77236
+remove (they all have 0 as a number of lions -- maybe we will keep them eventually ?) s165 t101874.10 t1475.4 t53055 t57427 t60317 t62190 t75009 t77236
 
 ```{r Cleaning}
 
@@ -302,25 +278,18 @@ DF_lions_data_clean <- DF_lions_data_clean |>
 
 ```
 
-
 ### 1.1.2. Outliers
-Change the first 7 in utmn for a 9:
-"t102747" & "s109502"
 
-Take out "t64548" because utmn has 6 numbers --> will change later.
-same for s0.58
+Change the first 7 in utmn for a 9: "t102747" & "s109502"
 
-utme miss 1 number:
-and t60077
+Take out "t64548" because utmn has 6 numbers --\> will change later. same for s0.58
 
-utme has 1 number too many:
-t50935
-t72442
-t98672
-t115432
+utme miss 1 number: and t60077
 
-wrong coordinate:  (somewhere in tanzania, so probably a number is off)
-s24841
+utme has 1 number too many: t50935 t72442 t98672 t115432
+
+wrong coordinate: (somewhere in tanzania, so probably a number is off) s24841
+
 ```{r}
 
 DF_lions_data_clean <- DF_lions_data_clean |>
@@ -343,11 +312,10 @@ DF_lions_data_clean <- DF_lions_data_clean |>
 
 ```
 
-
-
 ### 1.1.3. Shapefiles
 
 Saving it to shp.
+
 ```{r}
 
 DB_lions_sf <- st_as_sf(DF_lions_data_clean, coords = c("utme", "utmn"), crs = 32736)
@@ -357,6 +325,7 @@ DB_lions_sf <- sf::st_write(DB_lions_sf, "data_files/DB_lions_sf.shp", delete_ds
 ```
 
 Change to wgs84
+
 ```{r}
 DB_lions_wgs84 <- st_transform(DB_lions_sf, crs = 4326)
 #4326 is the EPSG code for the WGS84 system, which uses degrees of latitude and longitude.
@@ -366,8 +335,8 @@ DB_lions_wgs84 <- sf::st_write(DB_lions_wgs84, "data_files/DB_lions_wgs84.shp", 
 
 ```
 
-
 ### 1.1.4. Summarize
+
 ```{r}
 
 # number of lions in each territory for the different years
@@ -402,8 +371,8 @@ write.csv2(lions_data_per_clan, "data_files/lions_data_per_clan.csv", row.names 
 
 ```
 
-
 ### 1.1.5. Map
+
 ```{r}
 
 # Reload our base map CD_peryear_mapleaflet
@@ -438,8 +407,6 @@ I want to calculate the distance from the den location points to the closest lio
 
 ```
 
-
-
 ## 1.2. Distance to Talek
 
 ```{r}
@@ -463,7 +430,6 @@ RandomPointsCD_year_data$dst_tl <- as.numeric(st_distance(RandomPointsCD_year_da
 
 ```
 
-
 ## 1.3. Land cover (LULC)
 
 Now we will use the landcover raster from Spagnuolo et al. 2018. It has way more precise categories of land cover by using multi-date radar and optical imagery in a highly accurate way. More importantly, it was validated with field observations.
@@ -478,11 +444,9 @@ Mara_LULC
 plot(Mara_LULC, col = terrain.colors(20))
 ```
 
-
 ### 1.3.1. Extract land cover
 
-We want to extract the land cover for my specific CD and ramdom points created.
-To do this we will use the raster directly, so first we need to transfer my dataframe of Random/used points into a vector (terra format) and then extract the land cover respective to each location.
+We want to extract the land cover for my specific CD and ramdom points created. To do this we will use the raster directly, so first we need to transfer my dataframe of Random/used points into a vector (terra format) and then extract the land cover respective to each location.
 
 ```{r}
 # Convert sf → SpatVector (terra format)
@@ -496,19 +460,7 @@ Now we change the code to what it is:
 
 The type_id translates to land cover class as follows (classes defined in Table 1 of the attached paper):
 
-type_id 2 = Barren
-type_id 5 = Riverine forest
-type_id 6 = Upland forest
-type_id 7 = Grass Acacia
-type_id 8 = Grass Balanites
-type_id 10 = Tall grass
-type_id 11 = Medium grass
-type_id 13 = Short grass
-type_id 14 = Shrub
-type_id 17 = Water
-type_id 18 = Emergent wetland
-type_id 20 = Wet meadow
-
+type_id 2 = Barren type_id 5 = Riverine forest type_id 6 = Upland forest type_id 7 = Grass Acacia type_id 8 = Grass Balanites type_id 10 = Tall grass type_id 11 = Medium grass type_id 13 = Short grass type_id 14 = Shrub type_id 17 = Water type_id 18 = Emergent wetland type_id 20 = Wet meadow
 
 ```{r}
 RandomPointsCD_data <- RandomPointsCD_year_data |>
@@ -544,7 +496,6 @@ RandomPointsCD_data_dens <- RandomPointsCD_data |>
 
 ```
 
-
 ```{r}
 
 CD_points <- RandomPointsCD_data |>
@@ -558,6 +509,7 @@ mapview(test_map)
 ```
 
 Verify landmarks
+
 ```{r}
 
 landmark <- tblLandmarks |>
@@ -567,8 +519,6 @@ landmark_sf <- st_as_sf(landmark, coords = c("utme", "utmn"), crs = 32736)
 
 mapview(landmark_sf)
 ```
-
-
 
 ### 1.3.2. Map
 
@@ -580,8 +530,6 @@ Mara_LULC_wgs84_small <- terra::aggregate(Mara_LULC_wgs84, fact = 20)
 
 
 ```
-
-
 
 ```{r}
 
@@ -617,7 +565,6 @@ Mara_LULC_CD_leaflet
 htmlwidgets::saveWidget(Mara_LULC_CD_leaflet, file = "Maps/Mara_LULC_CD_leaflet.html", selfcontained = TRUE)
 ```
 
-
 ```{r}
 
 Mara_LULC_CDRandom_leaflet <- leaflet() |>
@@ -648,9 +595,8 @@ Mara_LULC_CDRandom_leaflet
 htmlwidgets::saveWidget(Mara_LULC_CDRandom_leaflet, file = "Maps/Mara_LULC_CDRandom_leaflet.html", selfcontained = TRUE)
 ```
 
-
-
 ### 1.3.3. Landcover with NAs
+
 ```{r}
 RandomPointsCD_data_landcoverNA <- RandomPointsCD_data |>
   filter(is.na(landcover))
@@ -660,8 +606,8 @@ mapview(RandomPointsCD_data_landcoverNA)
 
 ```
 
-
 I will put a temporary value for those points that are outside of the Mara:
+
 ```{r}
 
 RandomPointsCD_data <- RandomPointsCD_data |>
@@ -675,17 +621,14 @@ mapview(RandomPointsCD_data_landcoverOutside)
 
 ```
 
-
-
 ## 1.4. Distance to water
 
 To get the distance to the closest water source, here are the steps we need to do :
 
-1. Identify water sources in the Masai Mara (type 17 of LULC is water) --> I need to extract class == 17 to create a water raster.
-2. Convert that into a raster mask (water = 1, non-water = 0).
-3. Compute distance to nearest water pixel.
-4. Sample that distance at your points.
-
+1.  Identify water sources in the Masai Mara (type 17 of LULC is water) --\> I need to extract class == 17 to create a water raster.
+2.  Convert that into a raster mask (water = 1, non-water = 0).
+3.  Compute distance to nearest water pixel.
+4.  Sample that distance at your points.
 
 ```{r}
 # create binary water raster (1 = water, NA = non-water)
@@ -695,9 +638,7 @@ water_rast <- ifel(Mara_LULC == 17, 1, NA)
 plot(water_rast)
 ```
 
-
-Compute distance to nearest water pixel
-This computes Euclidean distance from every pixel to the closest water pixel.
+Compute distance to nearest water pixel This computes Euclidean distance from every pixel to the closest water pixel.
 
 ```{r}
 dist_to_water <- distance(water_rast)
@@ -705,8 +646,8 @@ dist_to_water <- distance(water_rast)
 plot(dist_to_water)
 ```
 
-
 Calculating distance from water for each used and available points:
+
 ```{r}
 
 RandomPointsCD_data_water <- st_transform(RandomPointsCD_data, crs(dist_to_water))
@@ -719,12 +660,9 @@ RandomPointsCD_data$dist_water_m <- terra::extract(
 
 ```
 
-
-
-
 ## 1.5. Distance from edge of the territory
 
-1. Same as with water, we want to create a binary raster for the reserve.
+1.  Same as with water, we want to create a binary raster for the reserve.
 
 ```{r}
 reserve_rast <- ifel(!is.na(Mara_LULC), 1, NA)
@@ -732,7 +670,7 @@ reserve_rast <- ifel(!is.na(Mara_LULC), 1, NA)
 plot(reserve_rast)
 ```
 
-2. extract the border pixels
+2.  extract the border pixels
 
 ```{r}
 # Identify reserve boundary
@@ -745,15 +683,16 @@ reserve_border[reserve_border == 0] <- NA
 plot(reserve_border)
 ```
 
-3. compute distance to border
+3.  compute distance to border
+
 ```{r}
 dist_to_border <- distance(reserve_border)
 
 plot(dist_to_border) #works!
 ```
 
+4.  calculate distances from border for each used/available points
 
-4. calculate distances from border for each used/available points
 ```{r}
 points_border <- st_transform(RandomPointsCD_data, crs(dist_to_border))
 
@@ -761,28 +700,10 @@ RandomPointsCD_data$dist_border_m <- terra::extract(dist_to_border, vect(points_
 
 ```
 
-
-
 ## 1.6. Distance to roads
 
-Will do the same thing as the water and border of territory, but here, I will need to first find a raster or something that has the roads pixels and stuff. 
+Will do the same thing as the water and border of territory, but here, I will need to first find a raster or something that has the roads pixels and stuff.
 
 ```{r}
 
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
