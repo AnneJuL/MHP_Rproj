@@ -88,7 +88,6 @@ CD_lions_wgs84 <- sf::st_read("data_files/CD_lions_wgs84.shp")
 RandomPointsCD_data <- sf::st_read("data_files/RandomPointsCD_data.shp")
 ```
 
-
 # 1. Modelling the RSF
 
 ALSO, we need to control for the obs effort (some years field team would go more on obs vs other years/season). I guess with year as a random, and month as a covariable, it does control for this...
@@ -97,15 +96,11 @@ ALSO, we need to control for the obs effort (some years field team would go more
 
 7)  Quick tips for RSF modelling
 
-- Treat landcover as a categorical predictor (factor) in your logistic/conditional logistic RSF (used vs available).
+-   Treat landcover as a categorical predictor (factor) in your logistic/conditional logistic RSF (used vs available).
 
-- If you used a very fine raster (10 m) but your hyena den location accuracy is coarse (GPS error), consider buffering points or using a majority focal window to reduce misclassification from single-pixel noise.
+-   If you used a very fine raster (10 m) but your hyena den location accuracy is coarse (GPS error), consider buffering points or using a majority focal window to reduce misclassification from single-pixel noise.
 
-- If you want multi-year matching (landcover year of den use), pick the dataset year accordingly (Copernicus 2019 / WorldCover 2020 / MODIS yearly).
-
-
-
-
+-   If you want multi-year matching (landcover year of den use), pick the dataset year accordingly (Copernicus 2019 / WorldCover 2020 / MODIS yearly).
 
 ## 1.1. RSF model
 
@@ -123,9 +118,6 @@ brm_RSF <- brms::brm(case ~ landcover + (1|year) + (1|clan),
 
 
 ```
-
-
-
 
 ## 1.2. Distance to Talek model
 
