@@ -18,7 +18,6 @@ Installing the package to have access to the MHP data (Just for the first time).
 #usethis::create_github_token() # to create a Token
 
 #gitcreds::gitcreds_set()
-
 #devtools::install_github("MaraHyenaProject/hyenadata", auth_token = gh::gh_token())
 
 ```
