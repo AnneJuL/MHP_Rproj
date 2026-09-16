@@ -51,7 +51,7 @@ library(leaflet.extras)
 library(amt)
 
 
-#from Gu�lat
+#from Guelat
 library(leaflet.extras2)
 library(terra) #to work with raster data
 library(lwgeom)
