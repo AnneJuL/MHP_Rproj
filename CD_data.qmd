@@ -120,7 +120,6 @@ CD_loc_data <- tblLandmarks |>
   select(landmark_id, utme, utmn, date) |>
   drop_na(utme, utmn)
 
-
 CD_loc_data_date <- CD_loc_data |>
   separate(date, c("date1", "date2"), sep = " ", remove=FALSE) |>
   separate(date2, c("year", "month", "day"), sep = "-", remove = F) |>
