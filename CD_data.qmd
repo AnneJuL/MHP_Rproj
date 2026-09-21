@@ -12,15 +12,15 @@ Installing the package to have access to the MHP data (Just for the first time).
 
 ```{r For MHP data}
 
-install.packages("usethis")
-install.packages("devtools")
+#install.packages("usethis")
+#install.packages("devtools")
 
-library(usethis)
-library(devtools)
-usethis::create_github_token() # to create a Token
+#library(usethis)
+#library(devtools)
+#usethis::create_github_token() # to create a Token
 
-gitcreds::gitcreds_set()
-devtools::install_github("MaraHyenaProject/hyenadata", auth_token = gh::gh_token())
+#gitcreds::gitcreds_set()
+#devtools::install_github("MaraHyenaProject/hyenadata", auth_token = gh::gh_token())
 
 ```
 
