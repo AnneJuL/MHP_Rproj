@@ -12,13 +12,15 @@ Installing the package to have access to the MHP data (Just for the first time).
 
 ```{r For MHP data}
 
-#install.packages("usethis")
+install.packages("usethis")
+install.packages("devtools")
 
-#library(usethis)
-#usethis::create_github_token() # to create a Token
+library(usethis)
+library(devtools)
+usethis::create_github_token() # to create a Token
 
-#gitcreds::gitcreds_set()
-#devtools::install_github("MaraHyenaProject/hyenadata", auth_token = gh::gh_token())
+gitcreds::gitcreds_set()
+devtools::install_github("MaraHyenaProject/hyenadata", auth_token = gh::gh_token())
 
 ```
 
@@ -977,8 +979,12 @@ DB_locations_for_MCPs_clean <- DB_locations_for_MCPs |>
   # for t131068
   mutate(utme = ifelse(session == "t131068", "747931", utme)) |>
   #for t131306
-  mutate()
-  
+  mutate(utme = ifelse(session == "t131306", "750067", utme)) |>
+  # for t132310 -- since I dont know the problem right now, I'll just remove it for now
+  filter(utme != "7482438") |>
+  # for t132571 -- same as above:
+  filter(utme != "74827")
+
   
 ```
 
@@ -992,7 +998,7 @@ DB_check_utme <- DB_locations_for_MCPs_clean |>
 # the four sessions :
 # t131068 -- I think we have an extra 7 in the number (7477931, should be 747931)
 # t131306 -- Same problem, I think there is an extra 0 : 7500067 -> 750067
-# t132310 -- Dont know the problem here... 7482438 an extra 8 after the 4 ?
+# t132310 -- Dont know the problem here... 7482438 an extra 8 after the 3 at the end ?
 # t132571 -- Missing a number: 74827
 
 
