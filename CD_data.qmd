@@ -94,7 +94,6 @@ load_all_tables <- function(){
 }
 
 load_all_tables()
-
 ```
 
 ```{r}
@@ -124,7 +123,6 @@ CD_loc_data_date <- CD_loc_data |>
   separate(date, c("date1", "date2"), sep = " ", remove=FALSE) |>
   separate(date2, c("year", "month", "day"), sep = "-", remove = F) |>
   separate(date1, c("month1", "day1", "year1"), sep = "/", remove = F)
-
 ```
 
 I gave up... The date column was too messed up so I exported it into a csv file, added the year column by hand and now I just reimport it here:
@@ -138,7 +136,6 @@ CD_loc_data <- CD_loc_data |>
 ```
 
 ```{r Session+Location data}
-
 Sess_data <- tblSessions |>
   select(clan, session) |>
   subset(str_detect(clan, "talek") | str_detect(clan, "serena") | str_detect(clan, "happy.zebra"))
@@ -180,7 +177,6 @@ length(unique(Loc_HyenasPerSess$session)) #77178
 Here I will get the difference in sessions (the 51022 sessions):
 
 ```{r Difference in sessions}
-
 HyenasPerSession_uniqueSess <- HyenasPerSession_data |>
   distinct(session, .keep_all = T) # 128200
 
@@ -192,7 +188,7 @@ HyenasPerSession_uniqueSess_diff <- HyenasPerSession_uniqueSess |>
    filter(!session %in% Loc_HyenasPerSess_uniqueSess$session) #51022
 
 # So it seems that it is all the sessions before 2002 (including 2002), and then some sessions throughout the whole time frame.
-#Maybe they are session outside of our desired 4 clans
+# Maybe they are session outside of our desired 4 clans
 
 ```
 
@@ -202,7 +198,7 @@ Now, I am going to use tblSessions (hopefully all the same sessions are in this 
 
 HyenasPerSession_uniqueSess_clan <- tblSessions |>
   select(clan, session, location, date) |>
-  filter(session %in% HyenasPerSession_uniqueSess$session) #128200 --> good
+  filter(session %in% HyenasPerSession_uniqueSess$session) # 128200 --> good
 
 
 #now we remerge the whole dataframe, not just the unique session:
@@ -241,7 +237,7 @@ Loc_HyenasPerSess_clan_uniqueSess <- Loc_HyenasPerSess_clan |>
 
 # the session different:
 HyenasPerSession_clan_uniqueSess_diff <- HyenasPerSession_clan_uniqueSess |>
-   filter(!session %in% Loc_HyenasPerSess_clan_uniqueSess$session) #50963
+   filter(!session %in% Loc_HyenasPerSess_clan_uniqueSess$session) #50963  --- update from Sep 18 = 50965
 
 ```
 
@@ -285,7 +281,7 @@ Loc_HyenasPerSess_CD_uniqueSess <- Loc_HyenasPerSess_CD |>
 
 # the session different:
 HyenasPerSession_CD_uniqueSess_diff <- HyenasPerSession_CD_data_uniqueSess |>
-   filter(!session %in% Loc_HyenasPerSess_CD_uniqueSess$session) #50963
+   filter(!session %in% Loc_HyenasPerSess_CD_uniqueSess$session)
 
 # Here we have a difference of 7632 sessions, also possibly all from before 2002 and some throughout the time serie
 
@@ -300,14 +296,13 @@ HyenasLocPerSession_CD <- merge(Loc_HyenasPerSess_CD_uniqueSess, HyenasPerSessio
 ```
 
 ```{r}
-
 HyenasLocPerSession_CD <- HyenasLocPerSession_CD |>
   separate(date, c("year", "month", "day"), sep = "-", remove = F) |>
   mutate(landmark_id = str_replace_all(landmark_id, " ", "_")) |>
   select(-utme, -utmn)
 
 length(unique(HyenasLocPerSession_CD$session)) 
-# 16453 sessions
+# 16453 sessions  --- update from 18 sept = 16851
 ```
 
 ## 1.3. Filling utme/utmn
@@ -401,7 +396,6 @@ near_Fever_T_ND/CD_Cplex_" ~ "Fever_Tree_Natal_Den/Communal_Den_Complex",
   filter(landmark_id != "NCM_D")
 
 
-
 ```
 
 Joining utme and utmn columns:
@@ -415,7 +409,7 @@ left_join(Landmarks %>% select(landmark_id, utme, utmn, category),
 #now here I keep only the landmarks that are cd or d:
 HyenasLocPerSession_CD_coord <- HyenasLocPerSession_CD_coord |>
   subset(category == "cd" | category == "d")
-#119205 obs
+#119205 obs --- update from 18 sept = 123260
 
 ```
 
@@ -464,10 +458,10 @@ HyenasLocPerSession_CD_coord_clean <- HyenasLocPerSession_CD_coord  |>
 
 ```{r}
 CD_check_utme <- HyenasLocPerSession_CD_coord_clean |>
-  filter(nchar(utme) != 6) # now it is 0
-
+  filter(nchar(utme) != 6) # now it is 0 (update on 18 sept is 0 too)
+ 
 CD_check_utmn <- HyenasLocPerSession_CD_coord_clean |>
-  filter(nchar(utmn) != 7) # now is 0
+  filter(nchar(utmn) != 7) # now is 0 (update on 18 sept is 0 too)
 ```
 
 ## 1.4. Active CD - tblLifeHistory.wide
@@ -477,7 +471,6 @@ Here I will find a way to filter out the active dens from the non active.
 Using the hyenas ID, I want to identify the individuals that were cubs at a given year. Then, if they were cubs and seen at a den, I will consider the den as a communal den that year. So first, I want to create a dataframe with all individual IDs and their data of birth (DOB) including the year.
 
 ```{r}
-
 Life_history_data <- tblLifeHistory.wide |>
   select(id, dob, dengrad) |>
   mutate(dengrad = as.character(dengrad),
@@ -493,7 +486,6 @@ Life_history_data <- tblLifeHistory.wide |>
 ### 1.4.1. ActiveCD_data
 
 ```{r}
-
 ActiveCD_PerHyenas_data <- HyenasLocPerSession_CD_coord_clean |>
   #keep only the landmark_id with den in it
   subset(str_detect(landmark_id, "den") | str_detect(landmark_id, "Den")) |>
@@ -502,16 +494,14 @@ ActiveCD_PerHyenas_data <- HyenasLocPerSession_CD_coord_clean |>
   filter(!utme == "744912" & !utmn == "9834809")
 
 
-
-
 ActiveCD_data <- ActiveCD_PerHyenas_data |>
   select(-id, -dob, -dengrad) |>
   distinct(session, .keep_all = T)
 
 
-
 length(unique(ActiveCD_data$landmark_id))
-#334 dens!!
+#343 dens!! --> updated on sept 16
+
 ```
 
 ### 1.4.2. Active CD year
@@ -520,7 +510,8 @@ length(unique(ActiveCD_data$landmark_id))
 ActiveCD_year <- ActiveCD_data |>
   select(-day) |>
   distinct(landmark_id, year, month, .keep_all = T)
-# 600 dens used in total 
+# 600 dens used in total
+# updated on sept 16: 1447 ???
 ```
 
 ### 1.4.3. Active CD unique
@@ -529,7 +520,7 @@ ActiveCD_year <- ActiveCD_data |>
 ActiveCD_unique <- ActiveCD_data |>
   select(-date, -year, -month, -day) |>
   distinct(landmark_id, .keep_all = T)
-#334 dens in total (no reuse)
+#343 dens in total (no reuse) --> updated on 16 sept
 ```
 
 ## 1.5. All GPS locations
@@ -574,7 +565,7 @@ dupe_rows_indID <- tblClanMembership |>
   ungroup()
 
 
-length(unique(dupe_rows_indID$id)) #20
+length(unique(dupe_rows_indID$id)) #20 (same on sept 18)
 
 ```
 
@@ -599,14 +590,11 @@ dupes_diff_clan <- DB_ind_clan %>%
   group_by(id) %>%
   filter(n_distinct(clan) > 1) %>%
   ungroup()
-
-
-
+# should be 0 (update on sept 18 = 0)
 
 ```
 
 ```{r Sessions with hyenas}
-
 # Then I want to add the clan for each individual 
 DB_hyenas_clan <- DB_hyenas |>
   left_join(DB_ind_clan %>% select(id, clan), by = "id", relationship = "many-to-many") |>
@@ -625,9 +613,6 @@ DB_hyenas_clan <- DB_hyenas_clan |>
   drop_na(hyenas) # No NA
 
 
-
-
-
 # So, all this time I had a dataset with the sessions ID, clan, hyenas ID and date:
 
 DB_session_hyenasID <- tblSessions |>
@@ -644,26 +629,27 @@ DB_session_hyenasID <- tblSessions |>
 # then, let's get rid of the NAs in hyenas_id:
 DB_session_hyenasID <- DB_session_hyenasID |>
   drop_na(hyenas) # from 151719 to 122558 (difference of 29161)
-
+# update from sept 18 = 124122 obs
 
 ```
 
 I have less lines in DB_session_hyenasID (122 558) than in DB_hyenas_clan (128 324). The difference is 5766. Let's see what are the differences:
 
 ```{r}
-
 extra_rows <- DB_session_hyenasID |>
   distinct(session, year, hyenas, clan) |>
   anti_join(DB_hyenas_clan |>
               distinct(session, year, hyenas, clan),
             by = c("session", "year", "hyenas", "clan"))
 #This is 6038
+# update 18 sept: 6304
 
 
 extra_sessions <- DB_session_hyenasID |>
   distinct(session) |>
   anti_join(DB_hyenas_clan %>% distinct(session), by = "session")
 #this is 1340
+#1394 (update 18 sept)
 
 
 extra_rows <- DB_session_hyenasID |>
@@ -672,6 +658,8 @@ extra_rows <- DB_session_hyenasID |>
     DB_hyenas_clan %>% distinct(session, year, clan),
     by = c("session", "year", "clan"))
 #1791
+#1860 (update on sept 18)
+
 
 common_rows <- DB_session_hyenasID %>%
   distinct(session, year, clan) %>%
@@ -679,13 +667,13 @@ common_rows <- DB_session_hyenasID %>%
     DB_hyenas_clan %>% distinct(session, year, clan),
     by = c("session", "year", "clan"))
 #120 767
+#122262 (update 18 sept)
 
 ```
 
 Now that we have the sessions with all the hyenas that were seen in each of our 4 territories, we want to add the GPS location of those sessions. We will use tblLocationsPerSession.
 
 ```{r Adding GPS location}
-
 DB_all_locations <- DB_session_hyenasID |>
   left_join(tblLocationsPerSession %>% select(session, landmark_id, utme, utmn), by = "session", relationship = "many-to-many") |>
   #take the first row out
@@ -694,8 +682,7 @@ DB_all_locations <- DB_session_hyenasID |>
   ungroup()
 
 dupe_rows <- DB_session_hyenasID %>%
-  filter(session %in% session[duplicated(session)])# no duplicates
-
+  filter(session %in% session[duplicated(session)])# no duplicates (update on sept 18 = 0)
 
 ```
 
@@ -814,7 +801,7 @@ DB_locations_for_MCPs <- DB_all_locations |>
 
 # important to remember those!! it's probably the sessions in 1988-2000 where the GPS locations was not associated to the sessions.
 DB_NAs <- DB_all_locations |>
-  filter(if_all(c(landmark_id, utme, utmn), is.na)) #51 267 obs
+  filter(if_all(c(landmark_id, utme, utmn), is.na)) #51 267 obs --- 51274 on sept 18
 
 ```
 
@@ -984,7 +971,14 @@ DB_locations_for_MCPs_clean <- DB_locations_for_MCPs |>
     utmn = if_else(
       grepl("^[67]", utmn),   # starts with 6 or 7
       sub("^[67]", "9", utmn),
-      utmn))
+      utmn)) |>
+  
+  #update on sept 18, will do them one by one I don't want to go back into that code...
+  # for t131068
+  mutate(utme = ifelse(session == "t131068", "747931", utme)) |>
+  #for t131306
+  mutate()
+  
   
 ```
 
@@ -993,10 +987,18 @@ To get utme and utmn values of + or - than 6 numbers:
 ```{r Check}
 
 DB_check_utme <- DB_locations_for_MCPs_clean |>
-  filter(nchar(utme) != 6) # now it is 0
+  filter(nchar(utme) != 6) # now it is 0 (update on sept 18 = 4)
+
+# the four sessions :
+# t131068 -- I think we have an extra 7 in the number (7477931, should be 747931)
+# t131306 -- Same problem, I think there is an extra 0 : 7500067 -> 750067
+# t132310 -- Dont know the problem here... 7482438 an extra 8 after the 4 ?
+# t132571 -- Missing a number: 74827
+
+
 
 DB_check_utmn <- DB_locations_for_MCPs_clean |>
-  filter(nchar(utmn) != 7) # now is 0
+  filter(nchar(utmn) != 7) # now is 0 (update on sept 18 = 0)
 
 ```
 
