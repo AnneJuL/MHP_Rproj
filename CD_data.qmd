@@ -984,8 +984,6 @@ DB_locations_for_MCPs_clean <- DB_locations_for_MCPs |>
   filter(utme != "7482438") |>
   # for t132571 -- same as above:
   filter(utme != "74827")
-
-  
 ```
 
 To get utme and utmn values of + or - than 6 numbers:
@@ -1001,10 +999,11 @@ DB_check_utme <- DB_locations_for_MCPs_clean |>
 # t132310 -- Dont know the problem here... 7482438 an extra 8 after the 3 at the end ?
 # t132571 -- Missing a number: 74827
 
+# update 21 sept = 0!
 
 
 DB_check_utmn <- DB_locations_for_MCPs_clean |>
-  filter(nchar(utmn) != 7) # now is 0 (update on sept 18 = 0)
+  filter(nchar(utmn) != 7) # now is 0 (update on sept 21 = 0)
 
 ```
 
@@ -1041,8 +1040,6 @@ DB_AllGPS <- DB_locations_for_MCPs_clean |>
 
 # NOw we visualize again
 mapview(DB_AllGPS_sf_clean, xcol = "utme", ycol = "utmn")
-  
-  
 ```
 
 # 2. Save and Shapefiles
