@@ -397,6 +397,8 @@ CD_lion_mapleaflet
 htmlwidgets::saveWidget(CD_lion_mapleaflet, file = "Maps/CD_lion_mapleaflet.html", selfcontained = TRUE)
 ```
 
+
+
 ### 1.1.6. Distance to closest lion sighting
 
 I want to calculate the distance from the den location points to the closest lion sighting.
