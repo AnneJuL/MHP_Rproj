@@ -1218,12 +1218,17 @@ Leaflet is a bit more complex than mapview and can get you more options for mapp
 
 We will create a basemap for starter: - Leaflet tile : draws the map tiles. There are numerous types of map tiles. - Layers Control: Leaflet has a nice little control that allows your users to control which layers they see on your map
 
+options = tileOptions(
+      userAgent = "AJLMap/1.0 (laberge7@msu.edu)"
+      
+
 ```{r Leaflet per year}
 
 pal <- colorFactor(palette = "viridis", domain = ActiveCD_wgs84$clan)
 
 CD_peryear_mapleaflet <- leaflet() |>
-  addTiles()
+  addTiles(
+    urlTemplate = "https://tile.openstreetmap.org/{z}/{x}/{y}.png")
 
 # Add points grouped by Year, colored by Clan
 years <- unique(ActiveCD_wgs84$year)
