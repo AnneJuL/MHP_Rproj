@@ -8,6 +8,4 @@ editor_options:
 
 ------------------------------------------------------------------------
 
-Resource selection function (RSF) to identify drivers of commmunal den location. 
-Mara Hyena Project
-By Anne Ju Laberge
+Resource selection function (RSF) to identify drivers of commmunal den location. Mara Hyena Project By Anne Ju Laberge

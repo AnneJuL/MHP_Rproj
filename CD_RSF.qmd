@@ -10,7 +10,7 @@ editor_options:
 
 Load packages
 
-git config --global user.email "anne.ju.laberge@usherbrooke.ca"
+git config --global user.email "anne.ju.laberge\@usherbrooke.ca"
 
 ```{r Packages}
 
