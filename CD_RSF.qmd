@@ -128,7 +128,7 @@ brm_RSF <- brms::brm(case ~ landcover + (1|year) + (1|clan),
 
 ## 1.2. Distance to Talek model
 
-```{r brms tlaek model}
+```{r brms talek model}
 CD_RSF_data_tl <- RandomPointsCD_data |>
   filter(clan == "talek")
 

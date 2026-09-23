@@ -117,7 +117,7 @@ mapview::mapviewOptions(basemaps = c("Esri.WorldGrayCanvas","Stadia.AlidadeSmoot
 
 I will be using the tblLandmarks to identified CDs' locations (GPS points). Maybe also tblSessions/tblLocationsPerSession to ID sessions at communal dens and then have the location with the time/year.
 
-```{r Location data}
+```{r Location data - old}
 str(tblLandmarks)
 
 CD_loc_data <- tblLandmarks |>
@@ -538,7 +538,7 @@ We will be using the GPS locations of all the points that hyenas were seen. We w
 
 So I have the table hyenas per session, which has a column for hyena IDs and session IDs. I will keep just these two rows, and filter to keep only serena's sessions and talek (not fig tree, pond, etc.). I will also add the individual's clan with tlbHyenas.
 
-```{r Sessions with hyenas}
+```{r Sessions with hyenas1}
 
 DB_hyenas <- tblHyenasPerSession |>
   select(session, id, date) |>
@@ -580,7 +580,7 @@ length(unique(dupe_rows_indID$id)) #20 (same on sept 18)
 
 Slicing the hyenas with the correct clan :
 
-```{r Sessions with hyenas}
+```{r Sessions with hyenas2}
 
 DB_ind_clan <- tblClanMembership |> # there are 3097 hyenas
   select(id, clan, status) |>
@@ -603,7 +603,7 @@ dupes_diff_clan <- DB_ind_clan %>%
 
 ```
 
-```{r Sessions with hyenas}
+```{r Sessions with hyenas3}
 # Then I want to add the clan for each individual 
 DB_hyenas_clan <- DB_hyenas |>
   left_join(DB_ind_clan %>% select(id, clan), by = "id", relationship = "many-to-many") |>
@@ -1071,13 +1071,13 @@ write_csv2(ActiveCD_year, "data_files/ActiveCD_year.csv")
 
 All GPS location data, not just CD:
 
-```{r Save}
+```{r Save1}
 write_csv2(DB_AllGPS, "data_files/DB_AllGPS.csv")
 ```
 
 Hyena data for CD sessions:
 
-```{r Save}
+```{r Save2}
 #For fiona:
 write_csv2(ActiveCD_PerHyenas_data, "data_files/ActiveCD_PerHyenas_data.csv") #active CD with a hyena id column
 
@@ -1378,7 +1378,7 @@ AllGPS_mapleaflet  # display the map
 
 ```
 
-```{r Save}
+```{r}
 #save
 htmlwidgets::saveWidget(AllGPS_mapleaflet, file = "Maps/AllGPS_mapleaflet.html", selfcontained = TRUE)
 
@@ -1429,7 +1429,7 @@ AllGPS_perlocation_mapleaflet <- AllGPS_perlocation_mapleaflet |>
 AllGPS_perlocation_mapleaflet
 ```
 
-```{r Save}
+```{r}
 #save
 htmlwidgets::saveWidget(AllGPS_perlocation_mapleaflet, file = "Maps/AllGPS_perlocation_mapleaflet.html", selfcontained = TRUE)
 
@@ -1477,7 +1477,7 @@ AllGPS_location_perclan_mapleaflet <- AllGPS_location_perclan_mapleaflet |>
 AllGPS_location_perclan_mapleaflet
 ```
 
-```{r Save}
+```{r}
 #save
 htmlwidgets::saveWidget(AllGPS_location_perclan_mapleaflet, file = "Maps/AllGPS_location_perclan_mapleaflet.html", selfcontained = TRUE)
 
@@ -1631,7 +1631,7 @@ I don't think we will be using the 100% MCP... Gives way too large MCPs.
 
 Save
 
-```{r Save}
+```{r}
 
 # Save the dataframe
 mcp95_clan_sf <- sf::st_write(mcp95_clan_sf, "data_files/mcp95_clan_sf.shp", delete_dsn = TRUE)
@@ -1701,7 +1701,7 @@ included
 
 Save
 
-```{r Save}
+```{r}
 
 #  Save the dataframe
 mcp95_clan_year_sf <- sf::st_write(mcp95_clan_year_sf, "data_files/mcp95_clan_year_sf.shp", delete_dsn = T)
@@ -1722,7 +1722,7 @@ AllGPS_MCPs95_mapleaflet <- AllGPS_mapleaflet |>
 AllGPS_MCPs95_mapleaflet
 ```
 
-```{r Save}
+```{r}
 htmlwidgets::saveWidget(AllGPS_MCPs95_mapleaflet, file = "Maps/AllGPS_MCPs95_mapleaflet.html", selfcontained = TRUE)
 
 ```
@@ -1883,7 +1883,7 @@ RandomPointsCD_data <- RandomPointsCD_data |>
 
 Save
 
-```{r Save}
+```{r}
 RandomPointsCD_data <- sf::st_write(RandomPointsCD_data, "data_files/RandomPointsCD_data.shp", delete_dsn = T)
 ```
 
@@ -1957,7 +1957,7 @@ table(RandomPointsCD_year_data$case)
 
 ```
 
-```{r Save}
+```{r}
 
 RandomPointsCD_year_data <- sf::st_write(RandomPointsCD_year_data, "data_files/RandomPointsCD_year_data.shp", delete_dsn = T)
 

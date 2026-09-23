@@ -272,7 +272,7 @@ I got some num of individual that are 0 : s114919 --\> change to num = 2 t61954 
 
 remove (they all have 0 as a number of lions -- maybe we will keep them eventually ?) s165 t101874.10 t1475.4 t53055 t57427 t60317 t62190 t75009 t77236
 
-```{r Cleaning}
+```{r Cleaning 2}
 
 DF_lions_data_clean <- DF_lions_data_clean |>
   mutate(num_lion = ifelse(session == "s114919", 2, num_lion)) |>
