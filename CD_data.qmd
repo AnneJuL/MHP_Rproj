@@ -105,6 +105,12 @@ load_all_tables()
 #write_csv2(tblLifeHistory.wide, "data_files/tblLifeHistory.wide.csv")
 ```
 
+For mapview to work? Update on Sept 23
+```{r}
+mapview::mapviewOptions(basemaps = c("Esri.WorldGrayCanvas","Stadia.AlidadeSmoothDark","OpenStreetMap", "Esri.WorldImagery", "OpenTopoMap"))
+```
+
+
 # 1. Create data
 
 ## 1.1. Communal dens (CD) dataframe
@@ -493,7 +499,8 @@ ActiveCD_PerHyenas_data <- HyenasLocPerSession_CD_coord_clean |>
   subset(str_detect(landmark_id, "den") | str_detect(landmark_id, "Den")) |>
   left_join(Life_history_data %>% select(id, dob, dengrad), by = "id") %>%
   filter(date >= dob & date <= dengrad) |>
-  filter(!utme == "744912" & !utmn == "9834809")
+  filter(!utme == "744912" & !utmn == "9834809") |>
+  mutate(utmn = ifelse(landmark_id == "Migration_Den", sub("^(.)(9)", "\\18", utmn), utmn)) 
 
 
 ActiveCD_data <- ActiveCD_PerHyenas_data |>
@@ -1027,18 +1034,20 @@ We remove those outliers points:
 
 ```{r Outliers}
 
-#in sf objects
-DB_AllGPS_sf_clean <- DB_locations_for_MCPs_sf |>
-  select(-hyenas) |>
-  filter(!session %in% c("t120888", "s58", "t55969", "t112359", "s6974", "s115706", "s117340")) 
-
-
 # normal dataframe
 DB_AllGPS <- DB_locations_for_MCPs_clean |>
   select(-hyenas) |>
-  filter(!session %in% c("t120888", "s58", "t55969", "t112359", "s6974", "s115706", "s117340"))
+  filter(!session %in% c("t120888", "s58", "t55969", "t112359", "s6974", "s115706", "s117340")) |>
+  mutate(utmn = ifelse(session == "s132382", 9840046, utmn)) |>
+  # changing the second character to a 8 instead of a 9. the ^ marks start of string, the (.) says keep the first character, the (9) identifies if the second character is a 9, then the \\1 says keep the first charcater, and the 8 means the second character should be 8.
+  mutate(utmn = ifelse(landmark_id == "Migration_Den", sub("^(.)(9)", "\\18", utmn), utmn)) 
+  
 
-# NOw we visualize again
+#in sf objects
+DB_AllGPS_sf_clean <- st_as_sf(DB_AllGPS, coords = c("utme", "utmn"), crs = 32736)
+
+
+# Now we visualize again
 mapview(DB_AllGPS_sf_clean, xcol = "utme", ycol = "utmn")
 ```
 
@@ -1082,7 +1091,7 @@ This is the locations of all the hyenas seen in the 4 territories:
 
 # outlier:
 DB_AllGPS_sf <- DB_AllGPS_sf_clean |>
-  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den", "Mausoleun_at_Halicarnassus_Den")) 
+  filter(!landmark_id %in% c("17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den", "Mausoleun_at_Halicarnassus_Den")) 
 
 
 # Saving it:
@@ -1099,7 +1108,7 @@ ActiveCD_sf <- st_as_sf(ActiveCD_data, coords = c("utme", "utmn"), crs = 32736) 
 
 #outlier
 ActiveCD_sf <- ActiveCD_sf |>
-  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
+  filter(!landmark_id %in% c("17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
 
 #Save the sf dataframe - can only do it once when it is not created before
 ActiveCD_sf <- sf::st_write(ActiveCD_sf, "data_files/ActiveCD_sf.shp", delete_dsn = TRUE)
@@ -1114,7 +1123,7 @@ ActiveCD_year_sf <- st_as_sf(ActiveCD_year, coords = c("utme", "utmn"), crs = 32
 
 #outlier
 ActiveCD_year_sf <- ActiveCD_year_sf |>
-  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
+  filter(!landmark_id %in% c("17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
 
 #Save the sf dataframe - can only do it once when it is not created before
 ActiveCD_year_sf <- sf::st_write(ActiveCD_year_sf, "data_files/ActiveCD_year_sf.shp", delete_dsn = TRUE)
@@ -1127,7 +1136,7 @@ ActiveCD_unique_sf <- st_as_sf(ActiveCD_unique, coords = c("utme", "utmn"), crs 
 
 #outlier
 ActiveCD_unique_sf <- ActiveCD_unique_sf |>
-  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
+  filter(!landmark_id %in% c("17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
 
 #Save the sf dataframe - can only do it once when it is not created before
 ActiveCD_unique_sf <- sf::st_write(ActiveCD_unique_sf, "data_files/ActiveCD_unique_sf.shp", delete_dsn = TRUE)
@@ -1144,7 +1153,7 @@ DB_AllGPS_sf_wgs84 <- st_transform(DB_AllGPS_sf, crs = 4326)
 
 # outlier:
 DB_AllGPS_sf_wgs84 <- DB_AllGPS_sf_wgs84 |>
-  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den", "Mausoleun_at_Halicarnassus_Den")) 
+  filter(!landmark_id %in% c("17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den", "Mausoleun_at_Halicarnassus_Den")) 
 
 # saving it:
 DB_AllGPS_sf_wgs84 <- sf::st_write(DB_AllGPS_sf_wgs84, "data_files/DB_AllGPS_sf_wgs84.shp", delete_dsn = TRUE)
@@ -1158,7 +1167,7 @@ ActiveCD data:
 ActiveCD_wgs84 <- st_transform(ActiveCD_sf, crs = 4326)
 
 ActiveCD_wgs84 <- ActiveCD_wgs84 |>
-  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
+  filter(!landmark_id %in% c("17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
 
 ActiveCD_wgs84 <- sf::st_write(ActiveCD_wgs84, "data_files/ActiveCD_wgs84.shp", delete_dsn = TRUE)
 
@@ -1168,7 +1177,7 @@ ActiveCD_wgs84 <- sf::st_write(ActiveCD_wgs84, "data_files/ActiveCD_wgs84.shp", 
 ActiveCD_year_wgs84 <- st_transform(ActiveCD_year_sf, crs = 4326)
 
 ActiveCD_year_wgs84 <- ActiveCD_year_wgs84 |>
-  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
+  filter(!landmark_id %in% c("17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
 
 ActiveCD_year_wgs84 <- sf::st_write(ActiveCD_year_wgs84, "data_files/ActiveCD_year_wgs84.shp", delete_dsn = TRUE)
 
@@ -1178,7 +1187,7 @@ ActiveCD_year_wgs84 <- sf::st_write(ActiveCD_year_wgs84, "data_files/ActiveCD_ye
 ActiveCD_unique_wgs84 <- st_transform(ActiveCD_unique_sf, crs = 4326)
 
 ActiveCD_unique_wgs84 <- ActiveCD_unique_wgs84 |>
-  filter(!landmark_id %in% c("Migration_Den", "17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
+  filter(!landmark_id %in% c("17km_Den", "Heathrow_Den", "Runway_Den", "Sleepy_Den",  "Mausoleun_at_Halicarnassus_Den")) 
 
 ActiveCD_unique_wgs84 <- sf::st_write(ActiveCD_unique_wgs84, "data_files/ActiveCD_unique_wgs84.shp", delete_dsn = TRUE)
 
@@ -1227,8 +1236,7 @@ options = tileOptions(
 pal <- colorFactor(palette = "viridis", domain = ActiveCD_wgs84$clan)
 
 CD_peryear_mapleaflet <- leaflet() |>
-  addTiles(
-    urlTemplate = "https://tile.openstreetmap.org/{z}/{x}/{y}.png")
+  addProviderTiles(providers$Esri.WorldImagery) 
 
 # Add points grouped by Year, colored by Clan
 years <- unique(ActiveCD_wgs84$year)
@@ -1285,7 +1293,7 @@ This is the same map, but we invert the clan and year variables
 pal_year <- colorFactor(palette = "viridis", domain = ActiveCD_wgs84$year)
 
 CD_perclan_mapleaflet <- leaflet() |>
-  addTiles()
+  addProviderTiles(providers$Esri.WorldImagery) 
 
 # Add points grouped by Year, colored by Clan
 clans <- unique(ActiveCD_wgs84$clan)
@@ -1339,7 +1347,7 @@ htmlwidgets::saveWidget(CD_perclan_mapleaflet, file = "Maps/CD_perclan_mapleafle
 pal2 <- colorFactor(palette = "viridis", domain = DB_AllGPS_sf_wgs84$clan)
 
 AllGPS_mapleaflet <- leaflet() |>
-  addTiles()
+  addProviderTiles(providers$Esri.WorldImagery) 
 
 # Add points grouped by Year, colored by Clan
 years2 <- unique(DB_AllGPS_sf_wgs84$year)
