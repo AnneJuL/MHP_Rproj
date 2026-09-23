@@ -12,6 +12,11 @@ Load packages
 
 git config --global user.email "anne.ju.laberge\@usherbrooke.ca"
 
+```{r}
+#removing what was loaded before:
+rm(list =)
+```
+
 ```{r Packages}
 
 # for data manipulations
@@ -142,8 +147,6 @@ brm_RSF_tl <- readRDS("brms_models/brm_RSF_tl.rds")
 
 summary(brm_RSF_tl)
 plot(conditional_effects(brm_RSF_tl), points = T)
-
-
 ```
 
 # 2. Lion RSF

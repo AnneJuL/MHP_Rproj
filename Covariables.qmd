@@ -8,6 +8,11 @@ editor_options:
 
 # 0. Libraries et al.
 
+```{r}
+#removing what was loaded before:
+rm(list =)
+```
+
 ```{r Packages}
 
 #install.packages("rgee")
@@ -85,7 +90,7 @@ RandomPointsCD_year_data <- sf::st_read("data_files/RandomPointsCD_year_data.shp
 ```{r}
 
 RandomPointsCD_mapleaflet <- leaflet() |> 
-  addTiles() |>
+  addProviderTiles(providers$Esri.WorldImagery) |>
 
   # Then plot random (case_ == 0) in blue (will appear on top)
   addCircleMarkers(
@@ -146,13 +151,14 @@ DF_lions <- tblPredatorsPerSession |>
   select(-c(3, 4, 6:8))
 
 DF_lions$num_individuals <- as.double(DF_lions$num_individuals)
-length(unique(DF_lions$session)) #6019
+length(unique(DF_lions$session)) #6019 --> update 23 sept is 6272
 
 #I want to sum up the number of lions for each session instead of having sessions duplicated rows
 DF_lions_sum <- DF_lions |>
   group_by(session) |>
   summarise(num_lion = sum(num_individuals, na.rm = TRUE))
 # suppose to have 6019 rows
+# now update from sept 23 --> 6272
 
 ```
 
@@ -278,6 +284,8 @@ DF_lions_data_clean <- DF_lions_data_clean |>
 
 ```
 
+
+
 ### 1.1.2. Outliers
 
 Change the first 7 in utmn for a 9: "t102747" & "s109502"
@@ -306,10 +314,6 @@ DF_lions_data_clean <- DF_lions_data_clean |>
    #removing the "." in the clan names
   mutate(clan = str_replace_all(clan, "talekw", "talek")) |>
   mutate(clan = str_replace_all(clan, "\\.", ""))
-
-
-  
-
 ```
 
 ### 1.1.3. Shapefiles
@@ -367,8 +371,6 @@ save_as_html(lions_data_perclan_tab, path = "Tables/lions_data_perclan_tab.html"
 
 #Save
 write.csv2(lions_data_per_clan, "data_files/lions_data_per_clan.csv", row.names = F, quote = F)
-
-
 ```
 
 ### 1.1.5. Map
@@ -393,8 +395,6 @@ CD_lion_mapleaflet
 
 #save
 htmlwidgets::saveWidget(CD_lion_mapleaflet, file = "Maps/CD_lion_mapleaflet.html", selfcontained = TRUE)
-
-
 ```
 
 ### 1.1.6. Distance to closest lion sighting
@@ -403,9 +403,9 @@ I want to calculate the distance from the den location points to the closest lio
 
 ```{r}
 
-
-
 ```
+
+
 
 ## 1.2. Distance to Talek
 
@@ -449,7 +449,7 @@ plot(Mara_LULC, col = terrain.colors(20))
 We want to extract the land cover for my specific CD and ramdom points created. To do this we will use the raster directly, so first we need to transfer my dataframe of Random/used points into a vector (terra format) and then extract the land cover respective to each location.
 
 ```{r}
-# Convert sf → SpatVector (terra format)
+# Convert sf to SpatVector (terra format)
 RandomPointsCD_vect <- vect(RandomPointsCD_year_data)
 
 # Extract land cover values at each point
@@ -492,7 +492,7 @@ RandomPointsCD_data_dens <- RandomPointsCD_data |>
  filter(!grepl("den|_D\\b", lndmrk_, ignore.case = TRUE))
 
 # I changed that in CD_data and kept only the landmarks with a category of cd or d
-# should be 0 now
+# should be 0 now (update on sept 23 is also 0)
 
 ```
 
@@ -528,11 +528,9 @@ Mara_LULC_wgs84 <- project(Mara_LULC, "EPSG:4326")
 
 Mara_LULC_wgs84_small <- terra::aggregate(Mara_LULC_wgs84, fact = 20)
 
-
 ```
 
 ```{r}
-
 # Create color palette:
 pal_LULC <- colorNumeric(palette = terrain.colors(20), 
                     domain = values(Mara_LULC_wgs84), 
@@ -545,7 +543,7 @@ CD_landcover <- RandomPointsCD_data |>
 
 
 Mara_LULC_CD_leaflet <- leaflet() |>
-  addTiles() |>
+  addProviderTiles(providers$Esri.WorldImagery) |>
   addRasterImage(Mara_LULC_wgs84_small, colors = pal_LULC, opacity = 0.6) |>
   addCircleMarkers(data = CD_landcover,
                    color = "red",
@@ -557,7 +555,7 @@ Mara_LULC_CD_leaflet <- leaflet() |>
             title = "Landcover", position = "bottomright")
 
 Mara_LULC_CD_leaflet
-
+# red points are the active dens
 ```
 
 ```{r}
@@ -568,7 +566,7 @@ htmlwidgets::saveWidget(Mara_LULC_CD_leaflet, file = "Maps/Mara_LULC_CD_leaflet.
 ```{r}
 
 Mara_LULC_CDRandom_leaflet <- leaflet() |>
-  addTiles() |>
+  addProviderTiles(providers$Esri.WorldImagery) |>
   addRasterImage(Mara_LULC_wgs84_small, colors = pal_LULC, opacity = 0.6) |>
   #random points first 
   addCircleMarkers(data = subset(RandomPointsCD_data, case == "0"),
@@ -615,11 +613,11 @@ RandomPointsCD_data <- RandomPointsCD_data |>
 
 
 RandomPointsCD_data_landcoverOutside <- RandomPointsCD_data |>
-  filter(landcover == "outside") #297
+  filter(landcover == "outside") #297 --> 781 updated on sept 23?? it seems like a lot compared to the 297...
+
 mapview(RandomPointsCD_data_landcoverOutside)
-
-
 ```
+
 
 ## 1.4. Distance to water
 
@@ -659,6 +657,7 @@ RandomPointsCD_data$dist_water_m <- terra::extract(
 )[,2]
 
 ```
+
 
 ## 1.5. Distance from edge of the territory
 
