@@ -1217,8 +1217,6 @@ clan_CD_mapview <- mapview(ActiveCD_sf, xcol = "utme", ycol = "utmn", zcol = "cl
 clan_CD_mapview
 
 htmlwidgets::saveWidget(clan_CD_mapview@map, file = "Maps/clan_CD_mapview.html", selfcontained = TRUE)
-
-
 ```
 
 ### ii) Basemap year (leaflet)
@@ -1396,7 +1394,7 @@ htmlwidgets::saveWidget(AllGPS_mapleaflet, file = "Maps/AllGPS_mapleaflet.html",
 pal3 <- colorFactor(c("red", "blue", "yellow", "green", "pink", "black", "orange"), domain = DB_AllGPS_sf_wgs84$location)
 
 AllGPS_perlocation_mapleaflet <- leaflet() |>
-  addTiles()
+  addProviderTiles(providers$Esri.WorldImagery) 
 
 # Add points grouped by Year, colored by Clan
 years2 <- unique(DB_AllGPS_sf_wgs84$year)
@@ -1432,7 +1430,7 @@ AllGPS_perlocation_mapleaflet <- AllGPS_perlocation_mapleaflet |>
             title = "Location", opacity = 1)
   
 
-AllGPS_perlocation_mapleaflet  # display the map
+AllGPS_perlocation_mapleaflet
 ```
 
 ```{r Save}
@@ -1446,7 +1444,7 @@ htmlwidgets::saveWidget(AllGPS_perlocation_mapleaflet, file = "Maps/AllGPS_perlo
 pal_clan <- colorFactor(palette = "viridis", domain = DB_AllGPS_sf_wgs84$clan)
 
 AllGPS_location_perclan_mapleaflet <- leaflet() |>
-  addTiles()
+  addProviderTiles(providers$Esri.WorldImagery) 
 
 loc <- unique(DB_AllGPS_sf_wgs84$location)
 
@@ -1480,7 +1478,7 @@ AllGPS_location_perclan_mapleaflet <- AllGPS_location_perclan_mapleaflet |>
             title = "Clan", opacity = 1)
   
 
-AllGPS_location_perclan_mapleaflet  # display the map
+AllGPS_location_perclan_mapleaflet
 ```
 
 ```{r Save}
@@ -1498,7 +1496,7 @@ with active CD dataframe:
 pal <- colorFactor(palette = "viridis", domain = ActiveCD_wgs84$clan)
 
 ActiveCD_monthlyPerYear_mapleaflet <- leaflet() |>
-  addTiles()
+  addProviderTiles(providers$Esri.WorldImagery) 
 
 # Add points grouped by Year, colored by Clan
 years <- unique(ActiveCD_wgs84$year)
@@ -1531,9 +1529,7 @@ ActiveCD_monthlyPerYear_mapleaflet <- ActiveCD_monthlyPerYear_mapleaflet |>
             title = "Clan", opacity = 1)
   
 
-ActiveCD_monthlyPerYear_mapleaflet  # display the map
-
-
+ActiveCD_monthlyPerYear_mapleaflet
 ```
 
 ```{r}
@@ -1738,7 +1734,8 @@ htmlwidgets::saveWidget(AllGPS_MCPs95_mapleaflet, file = "Maps/AllGPS_MCPs95_map
 ```{r Yearly MCPs}
 
 # Start with an empty leaflet map
-AllGPS_yearly_95MCPs_mapleaflet <- leaflet() |> addTiles()
+AllGPS_yearly_95MCPs_mapleaflet <- leaflet() |>
+  addProviderTiles(providers$Esri.WorldImagery) 
 
 # Define your clan palette
 pal2 <- colorFactor(palette = "viridis", domain = DB_AllGPS_sf_wgs84$clan)
@@ -1958,6 +1955,9 @@ RandomPointsCD_year_data <- RandomPointsCD_year_data |>
 #verify that I have the right numbers of case=1 (592)
 table(RandomPointsCD_year_data$case)
 # there is 1 point that has no random points with it
+# update on Sept 23 --> 
+#    0     1 
+#14250  1426 
 
 ```
 
@@ -1974,7 +1974,7 @@ Using the yearly data points:
 ```{r}
 
 RandomPointsCD_mapleaflet <- leaflet() |> 
-  addTiles() |>
+  addProviderTiles(providers$Esri.WorldImagery) |>
 
   # Then plot random (case_ == 0) in blue (will appear on top)
   addCircleMarkers(
@@ -2009,7 +2009,8 @@ Adding to the AllGPS
 
 # Adding the random point in the AllGPS_yearly_95MCPs_mapleaflet
 # New map object
-CD_yearly_95MCPs_withRandom_mapleaflet <- leaflet() |> addTiles()
+CD_yearly_95MCPs_withRandom_mapleaflet <- leaflet() |>
+  addProviderTiles(providers$Esri.WorldImagery) 
 
 pal2 <- colorFactor(palette = "viridis", domain = DB_AllGPS_sf_wgs84$clan)
 years2 <- sort(unique(DB_AllGPS_sf_wgs84$year))
@@ -2074,5 +2075,4 @@ CD_yearly_95MCPs_withRandom_mapleaflet
 ```{r}
 # Save the map
 htmlwidgets::saveWidget(CD_yearly_95MCPs_withRandom_mapleaflet, file = "Maps/CD_yearly_95MCPs_withRandom_mapleaflet.html", selfcontained = TRUE)
-
 ```
