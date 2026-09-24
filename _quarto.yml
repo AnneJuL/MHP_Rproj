@@ -19,7 +19,7 @@ format:
     code-link: true
     code-summary: "Show the code"
     theme: cosmo
-    embed-resources: true
+    embed-resources: false
     self-contained: true
     toc-depth: 5
     toc: true
