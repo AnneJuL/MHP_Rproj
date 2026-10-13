@@ -14,7 +14,7 @@ git config --global user.email "anne.ju.laberge\@usherbrooke.ca"
 
 ```{r}
 #removing what was loaded before:
-rm(list =)
+rm(list = ls())
 ```
 
 ```{r Packages}
@@ -92,16 +92,29 @@ CD_sf_lions <- sf::st_read("data_files/CD_sf_lions.shp")
 CD_lions_wgs84 <- sf::st_read("data_files/CD_lions_wgs84.shp")
 
 
-RandomPointsCD_data <- sf::st_read("data_files/RandomPointsCD_data.shp")
+RandomPointsCD_data <- sf::st_read("data_files/RandomPointsCD_data_covariables.shp")
 ```
 
-# 1. Modelling the RSF
+# 1. Exploratory plots
+
+For IBIO830, I need to do some exploratory figures.
+
+The prediction is that hyenas are selecting den locations closer to human communities. Here, human communities will be illustrated as th edge of the territory
+```{r}
+view(RandomPointsCD_data)
+
+```
+
+
+
+
+
+# 2. Modelling the RSF
 
 ALSO, we need to control for the obs effort (some years field team would go more on obs vs other years/season). I guess with year as a random, and month as a covariable, it does control for this...
 
 ------------------------------------------------------------------------
-
-7)  Quick tips for RSF modelling
+Quick tips for RSF modelling
 
 -   Treat landcover as a categorical predictor (factor) in your logistic/conditional logistic RSF (used vs available).
 
@@ -109,7 +122,7 @@ ALSO, we need to control for the obs effort (some years field team would go more
 
 -   If you want multi-year matching (landcover year of den use), pick the dataset year accordingly (Copernicus 2019 / WorldCover 2020 / MODIS yearly).
 
-## 1.1. RSF model
+## 2.1. RSF model
 
 I will separate the Talek points with the triangle ones, so that I can make a model with the Talek town borders as a variable.
 
@@ -126,7 +139,7 @@ brm_RSF <- brms::brm(case ~ landcover + (1|year) + (1|clan),
 
 ```
 
-## 1.2. Distance to Talek model
+## 2.2. Distance to Talek model
 
 ```{r brms talek model}
 CD_RSF_data_tl <- RandomPointsCD_data |>
@@ -149,4 +162,4 @@ summary(brm_RSF_tl)
 plot(conditional_effects(brm_RSF_tl), points = T)
 ```
 
-# 2. Lion RSF
+# 3. Lion RSF

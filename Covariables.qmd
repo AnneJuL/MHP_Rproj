@@ -701,6 +701,11 @@ RandomPointsCD_data$dist_border_m <- terra::extract(dist_to_border, vect(points_
 
 ```
 
+
+```{r}
+RandomPointsCD_data <- sf::st_write(RandomPointsCD_data, "data_files/RandomPointsCD_data_covariables.shp", delete_dsn = TRUE)
+```
+
 ## 1.6. Distance to roads
 
 Will do the same thing as the water and border of territory, but here, I will need to first find a raster or something that has the roads pixels and stuff.
