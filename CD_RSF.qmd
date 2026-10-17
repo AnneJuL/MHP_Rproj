@@ -98,13 +98,106 @@ RandomPointsCD_data <- sf::st_read("data_files/RandomPointsCD_data_covariables.s
 # 1. Exploratory plots
 
 For IBIO830, I need to do some exploratory figures.
+Figure1. Distribution of the data:
+```{r}
+RandomPointsCD_data <- RandomPointsCD_data |>
+  mutate(region = ifelse(clan == "serenan" | clan == "serenas" | clan == "happyzebra", "serena", "talek"))
+```
+
+
+```{r}
+RandomPointsCD_data$case <- as.factor(RandomPointsCD_data$case)
+
+legend_label_region <- c("serena" = "Serena", "talek" = "Talek")
+legend_label <- c("0" = "Available Points", "1" = "Used Points")
+
+
+Dist_plots <- ggplot(RandomPointsCD_data) +
+  geom_histogram(aes(x = dst_br_, col = case, fill = case)) +
+  facet_wrap(~ region + case, ncol = 2, labeller = labeller(region = legend_label_region, case = legend_label)) +
+  labs(x = "Distance to edge of the territory",
+       y = "Counts",
+       col = "Points",
+       fill = "Points") +
+  theme_minimal()
+
+Dist_plots
+```
+
+
+
 
 The prediction is that hyenas are selecting den locations closer to human communities. Here, human communities will be illustrated as th edge of the territory
+
+???cub number per den through years 
+number of ???
+
+
+
+For IBIO830: I will use this boxplot, as it looks like it is significant. 
 ```{r}
-view(RandomPointsCD_data)
+boxplot(graph_data_talek$dst_br_ ~ graph_data_talek$case)
+
+# ggplot:
+Boxplot_talek <- RandomPointsCD_data |>
+  filter(region == "talek") |>
+  ggplot() +
+  geom_boxplot(aes(y = dst_br_, x = case)) +
+  theme_minimal()
+  
+Boxplot_talek
+
+
+# ggplot:
+Boxplot_serena <- RandomPointsCD_data |>
+  filter(region == "serena") |>
+  ggplot() +
+  geom_boxplot(aes(y = dst_br_, x = case)) +
+  theme_minimal()
+  
+Boxplot_serena
+```
+
+Saving them:
+```{r}
 
 ```
 
+
+Other exploration:
+```{r}
+graph_data_talek <- RandomPointsCD_data |>
+  filter(region == "talek") |>
+  mutate(year = as.character(year)) 
+
+graph_data_talek_1 <- graph_data_talek|>
+  filter(case == 1)
+
+boxplot(graph_data_talek_1$dst_br_ ~ graph_data_talek_1$year)
+```
+So we want the relationship to be in recent years, the number is close to 0.
+
+
+Other interesting boxplots:
+```{r}
+boxplot(graph_data_talek$dst_tl ~ graph_data_talek$case)
+boxplot(graph_data_talek$dst_wt_ ~ graph_data_talek$case)
+```
+
+For Serena
+```{r}
+graph_data_serena <- RandomPointsCD_data |>
+  filter(region == "serena") |>
+  mutate(year = as.character(year)) 
+
+graph_serena_1 <- graph_data_serena |>
+  filter(case == 1)
+
+boxplot(graph_serena_1$dst_br_ ~ graph_serena_1$year)
+
+boxplot(graph_data_serena$dst_tl ~ graph_data_serena$case)
+boxplot(graph_data_serena$dst_wt_ ~ graph_data_serena$case)
+```
 
 
 

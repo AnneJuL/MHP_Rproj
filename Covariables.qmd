@@ -82,7 +82,7 @@ load_all_tables()
 ```{r Load dataframe}
 
 RandomPointsCD_year_data <- sf::st_read("data_files/RandomPointsCD_year_data.shp")
-
+ActiveCD_year <- read_csv2("data_files/ActiveCD_year.csv")
 ```
 
 ## 0.1. Visualization
