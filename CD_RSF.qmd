@@ -108,31 +108,21 @@ RandomPointsCD_data <- RandomPointsCD_data |>
 ```{r}
 RandomPointsCD_data$case <- as.factor(RandomPointsCD_data$case)
 
-legend_label_region <- c("serena" = "Serena", "talek" = "Talek")
-legend_label <- c("0" = "Available Points", "1" = "Used Points")
+region_labels <- c("serena" = "Serena", "talek" = "Talek")
+loc_labels <- c("0" = "Available Locations", "1" = "Used Locations")
 
 
 Dist_plots <- ggplot(RandomPointsCD_data) +
-  geom_histogram(aes(x = dst_br_, col = case, fill = case)) +
-  facet_wrap(~ region + case, ncol = 2, labeller = labeller(region = legend_label_region, case = legend_label)) +
+  geom_histogram(aes(x = dst_br_, col = case, fill = case), show.legend = F) +
+  facet_wrap(~ region + case, ncol = 2, labeller = labeller(region = region_labels, case = loc_labels)) +
   labs(x = "Distance to edge of the territory",
-       y = "Counts",
-       col = "Points",
-       fill = "Points") +
-  theme_minimal()
+       y = "Counts") +
+  theme(text = element_text(size = 15))
 
 Dist_plots
 ```
 
-
-
-
 The prediction is that hyenas are selecting den locations closer to human communities. Here, human communities will be illustrated as th edge of the territory
-
-???cub number per den through years 
-number of ???
-
-
 
 For IBIO830: I will use this boxplot, as it looks like it is significant. 
 ```{r}
@@ -142,9 +132,12 @@ boxplot(graph_data_talek$dst_br_ ~ graph_data_talek$case)
 Boxplot_talek <- RandomPointsCD_data |>
   filter(region == "talek") |>
   ggplot() +
-  geom_boxplot(aes(y = dst_br_, x = case)) +
-  theme_minimal()
-  
+  geom_boxplot(aes(y = dst_br_, x = case, fill = case), show.legend = F) +
+  geom_jitter(aes(y = dst_br_, x = case), show.legend = F, alpha = 0.03) +
+  scale_x_discrete(labels = loc_labels) +
+  labs(y = "Distance to edge of the territory",
+       x = "") +
+  theme(text = element_text(size = 15))  
 Boxplot_talek
 
 
@@ -152,16 +145,27 @@ Boxplot_talek
 Boxplot_serena <- RandomPointsCD_data |>
   filter(region == "serena") |>
   ggplot() +
-  geom_boxplot(aes(y = dst_br_, x = case)) +
-  theme_minimal()
+  geom_boxplot(aes(y = dst_br_, x = case, fill = case), show.legend = F) +
+  geom_jitter(aes(y = dst_br_, x = case), show.legend = F, alpha = 0.03) +
+  scale_x_discrete(labels = loc_labels) +
+  labs(y = "Distance to edge of the territory",
+       x = "") +
+  theme(text = element_text(size = 15))  
   
 Boxplot_serena
 ```
 
 Saving them:
 ```{r}
-
+ggsave('IBIO830/Dist_plots.tiff', plot = Dist_plots, height = 10, width = 10)
+ggsave('IBIO830/Boxplot_talek.tiff', plot = Boxplot_talek, height = 5, width = 5)
+ggsave('IBIO830/Boxplot_serena.tiff', plot = Boxplot_serena, height = 5, width = 5)
 ```
+
+
+???cub number per den through years 
+number of ???
+
 
 
 Other exploration:
