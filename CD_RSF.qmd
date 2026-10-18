@@ -27,6 +27,7 @@ library(dplyr) # data manip
 
 library(tidyr) # # for data manip
 library(ggplot2) # data visualization and graphs
+library(ggh4x) # for panel labels
 library(stringr) 
 library(lubridate) # to create my year column and month one
 library(ggspatial) # to make easy maps with ggplot
@@ -108,14 +109,21 @@ RandomPointsCD_data <- RandomPointsCD_data |>
 ```{r}
 RandomPointsCD_data$case <- as.factor(RandomPointsCD_data$case)
 
-region_labels <- c("serena" = "Serena", "talek" = "Talek")
-loc_labels <- c("0" = "Available Locations", "1" = "Used Locations")
+# For the purpose of the graphs, I am adding a combined variable (region+case)
+RandomPointsCD_graph <- RandomPointsCD_data |>
+  mutate(group = paste0(region, ".", case))
+  
+  
+region_labels <- c("serena.0" = "A. Serena\n Available Locations",
+                   "serena.1" = "B. Serena\n Used Locations",
+                   "talek.0" = "C. Talek\n Available Locations",
+                   "talek.1" = "D. Talek\n Used Locations")
 
 
-Dist_plots <- ggplot(RandomPointsCD_data) +
-  geom_histogram(aes(x = dst_br_, col = case, fill = case), show.legend = F) +
-  facet_wrap(~ region + case, ncol = 2, labeller = labeller(region = region_labels, case = loc_labels)) +
-  labs(x = "Distance to edge of the territory",
+Dist_plots <- ggplot(RandomPointsCD_graph) +
+  geom_histogram(aes(x = dst_br_), show.legend = F) +
+  facet_wrap(~ group, ncol = 2, labeller = labeller(group = region_labels)) +
+  labs(x = "Distance to edge of the territory (m)",
        y = "Counts") +
   theme(text = element_text(size = 15))
 
@@ -128,6 +136,8 @@ For IBIO830: I will use this boxplot, as it looks like it is significant.
 ```{r}
 boxplot(graph_data_talek$dst_br_ ~ graph_data_talek$case)
 
+loc_labels <- c("0" = "Available Locations", "1" = "Used Locations")
+
 # ggplot:
 Boxplot_talek <- RandomPointsCD_data |>
   filter(region == "talek") |>
@@ -135,7 +145,7 @@ Boxplot_talek <- RandomPointsCD_data |>
   geom_boxplot(aes(y = dst_br_, x = case, fill = case), show.legend = F) +
   geom_jitter(aes(y = dst_br_, x = case), show.legend = F, alpha = 0.03) +
   scale_x_discrete(labels = loc_labels) +
-  labs(y = "Distance to edge of the territory",
+  labs(y = "Distance to edge of the territory (m)",
        x = "") +
   theme(text = element_text(size = 15))  
 Boxplot_talek
@@ -148,7 +158,7 @@ Boxplot_serena <- RandomPointsCD_data |>
   geom_boxplot(aes(y = dst_br_, x = case, fill = case), show.legend = F) +
   geom_jitter(aes(y = dst_br_, x = case), show.legend = F, alpha = 0.03) +
   scale_x_discrete(labels = loc_labels) +
-  labs(y = "Distance to edge of the territory",
+  labs(y = "Distance to edge of the territory (m)",
        x = "") +
   theme(text = element_text(size = 15))  
   
