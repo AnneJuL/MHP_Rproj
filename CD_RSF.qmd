@@ -70,6 +70,8 @@ library(brms)
 library(glmmTMB) # to make RSF models
 library(lme4)
 library(sjPlot)
+library(ggeffects) # to visualize lmer models binomial easily
+
 
 library(purrr)
 ```
@@ -250,9 +252,12 @@ Quick tips for RSF modelling
 
 ### brms
 Will first do the distance to border for Talek dens
-```{r talek model}
+```{r}
 Data_talek$year <- as.double(Data_talek$year)
+```
 
+
+```{r talek model}
 Talek_RSF1 <- brm(case ~ scale(dist_br) + (1|year),
                   data = Data_talek, 
                   family = bernoulli(),
@@ -265,24 +270,34 @@ conditional_effects(Talek_RSF1)
 
 
 ### lme4
+
+```{r}
+talek_rsf <- glm(case ~ scale(dist_br), 
+                 family = binomial, 
+                 data = Data_talek)
+
+summary(talek_rsf)
+tab_model(talek_rsf)
+```
+
+```{r}
+ggpredict(talek_rsf, terms = "dist_br") |> 
+  plot()
+```
+
+
 ```{r rsf with lme4}
-talek_lm_rsf <- glmer(case ~ scale(dist_br) + (1|year), 
+talek_rsf2 <- glmer(case ~ scale(dist_br) + (1|year), 
                       family = "binomial", 
                       data = Data_talek)
-summary(talek_lm_rsf)
-plot_model(talek_lm_rsf)
-tab_model(talek_lm_rsf)
+summary(talek_rsf2)
+tab_model(talek_rsf2)
 ```
 
-
-***************
 ```{r}
-library(ggeffects)
-
-pred_br <- ggpredict(talek_lm_rsf, terms = "dist_br [all]")
-plot(pred_br)
+ggpredict(talek_rsf2, terms = "dist_br") |> 
+  plot()
 ```
-
 
 
 
