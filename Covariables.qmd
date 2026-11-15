@@ -82,7 +82,7 @@ load_all_tables()
 ```{r Load dataframe}
 
 RandomPointsCD_year_data <- sf::st_read("data_files/RandomPointsCD_year_data.shp")
-
+ActiveCD_year <- read_csv2("data_files/ActiveCD_year.csv")
 ```
 
 ## 0.1. Visualization
@@ -699,6 +699,11 @@ points_border <- st_transform(RandomPointsCD_data, crs(dist_to_border))
 
 RandomPointsCD_data$dist_border_m <- terra::extract(dist_to_border, vect(points_border))[,2]
 
+```
+
+
+```{r}
+RandomPointsCD_data <- sf::st_write(RandomPointsCD_data, "data_files/RandomPointsCD_data_covariables.shp", delete_dsn = TRUE)
 ```
 
 ## 1.6. Distance to roads

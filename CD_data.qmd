@@ -106,10 +106,10 @@ load_all_tables()
 ```
 
 For mapview to work? Update on Sept 23
+
 ```{r}
 mapview::mapviewOptions(basemaps = c("Esri.WorldGrayCanvas","Stadia.AlidadeSmoothDark","OpenStreetMap", "Esri.WorldImagery", "OpenTopoMap"))
 ```
-
 
 # 1. Create data
 
@@ -1050,6 +1050,7 @@ DB_AllGPS_sf_clean <- st_as_sf(DB_AllGPS, coords = c("utme", "utmn"), crs = 3273
 # Now we visualize again
 mapview(DB_AllGPS_sf_clean, xcol = "utme", ycol = "utmn")
 ```
+
 
 # 2. Save and Shapefiles
 

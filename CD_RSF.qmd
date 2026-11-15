@@ -14,7 +14,7 @@ git config --global user.email "anne.ju.laberge\@usherbrooke.ca"
 
 ```{r}
 #removing what was loaded before:
-rm(list =)
+rm(list = ls())
 ```
 
 ```{r Packages}
@@ -27,6 +27,7 @@ library(dplyr) # data manip
 
 library(tidyr) # # for data manip
 library(ggplot2) # data visualization and graphs
+library(ggh4x) # for panel labels
 library(stringr) 
 library(lubridate) # to create my year column and month one
 library(ggspatial) # to make easy maps with ggplot
@@ -92,16 +93,135 @@ CD_sf_lions <- sf::st_read("data_files/CD_sf_lions.shp")
 CD_lions_wgs84 <- sf::st_read("data_files/CD_lions_wgs84.shp")
 
 
-RandomPointsCD_data <- sf::st_read("data_files/RandomPointsCD_data.shp")
+RandomPointsCD_data <- sf::st_read("data_files/RandomPointsCD_data_covariables.shp")
 ```
 
-# 1. Modelling the RSF
+# 1. Exploratory plots
+
+For IBIO830, I need to do some exploratory figures.
+Figure1. Distribution of the data:
+```{r}
+RandomPointsCD_data <- RandomPointsCD_data |>
+  mutate(region = ifelse(clan == "serenan" | clan == "serenas" | clan == "happyzebra", "serena", "talek"))
+```
+
+
+```{r}
+RandomPointsCD_data$case <- as.factor(RandomPointsCD_data$case)
+
+# For the purpose of the graphs, I am adding a combined variable (region+case)
+RandomPointsCD_graph <- RandomPointsCD_data |>
+  mutate(group = paste0(region, ".", case))
+  
+  
+region_labels <- c("serena.0" = "A. Serena\n Available Locations",
+                   "serena.1" = "B. Serena\n Used Locations",
+                   "talek.0" = "C. Talek\n Available Locations",
+                   "talek.1" = "D. Talek\n Used Locations")
+
+
+Dist_plots <- ggplot(RandomPointsCD_graph) +
+  geom_histogram(aes(x = dst_br_), show.legend = F) +
+  facet_wrap(~ group, ncol = 2, labeller = labeller(group = region_labels)) +
+  labs(x = "Distance to edge of the territory (m)",
+       y = "Counts") +
+  theme(text = element_text(size = 15))
+
+Dist_plots
+```
+
+The prediction is that hyenas are selecting den locations closer to human communities. Here, human communities will be illustrated as th edge of the territory
+
+For IBIO830: I will use this boxplot, as it looks like it is significant. 
+```{r}
+boxplot(graph_data_talek$dst_br_ ~ graph_data_talek$case)
+
+loc_labels <- c("0" = "Available Locations", "1" = "Used Locations")
+
+# ggplot:
+Boxplot_talek <- RandomPointsCD_data |>
+  filter(region == "talek") |>
+  ggplot() +
+  geom_boxplot(aes(y = dst_br_, x = case, fill = case), show.legend = F) +
+  geom_jitter(aes(y = dst_br_, x = case), show.legend = F, alpha = 0.03) +
+  scale_x_discrete(labels = loc_labels) +
+  labs(y = "Distance to edge of the territory (m)",
+       x = "") +
+  theme(text = element_text(size = 15))  
+Boxplot_talek
+
+
+# ggplot:
+Boxplot_serena <- RandomPointsCD_data |>
+  filter(region == "serena") |>
+  ggplot() +
+  geom_boxplot(aes(y = dst_br_, x = case, fill = case), show.legend = F) +
+  geom_jitter(aes(y = dst_br_, x = case), show.legend = F, alpha = 0.03) +
+  scale_x_discrete(labels = loc_labels) +
+  labs(y = "Distance to edge of the territory (m)",
+       x = "") +
+  theme(text = element_text(size = 15))  
+  
+Boxplot_serena
+```
+
+Saving them:
+```{r}
+ggsave('IBIO830/Dist_plots.tiff', plot = Dist_plots, height = 10, width = 10)
+ggsave('IBIO830/Boxplot_talek.tiff', plot = Boxplot_talek, height = 5, width = 5)
+ggsave('IBIO830/Boxplot_serena.tiff', plot = Boxplot_serena, height = 5, width = 5)
+```
+
+
+???cub number per den through years 
+number of ???
+
+
+
+Other exploration:
+```{r}
+graph_data_talek <- RandomPointsCD_data |>
+  filter(region == "talek") |>
+  mutate(year = as.character(year)) 
+
+graph_data_talek_1 <- graph_data_talek|>
+  filter(case == 1)
+
+boxplot(graph_data_talek_1$dst_br_ ~ graph_data_talek_1$year)
+```
+So we want the relationship to be in recent years, the number is close to 0.
+
+
+Other interesting boxplots:
+```{r}
+boxplot(graph_data_talek$dst_tl ~ graph_data_talek$case)
+boxplot(graph_data_talek$dst_wt_ ~ graph_data_talek$case)
+```
+
+For Serena
+```{r}
+graph_data_serena <- RandomPointsCD_data |>
+  filter(region == "serena") |>
+  mutate(year = as.character(year)) 
+
+graph_serena_1 <- graph_data_serena |>
+  filter(case == 1)
+
+boxplot(graph_serena_1$dst_br_ ~ graph_serena_1$year)
+
+boxplot(graph_data_serena$dst_tl ~ graph_data_serena$case)
+boxplot(graph_data_serena$dst_wt_ ~ graph_data_serena$case)
+```
+
+
+
+
+# 2. Modelling the RSF
 
 ALSO, we need to control for the obs effort (some years field team would go more on obs vs other years/season). I guess with year as a random, and month as a covariable, it does control for this...
 
 ------------------------------------------------------------------------
-
-7)  Quick tips for RSF modelling
+Quick tips for RSF modelling
 
 -   Treat landcover as a categorical predictor (factor) in your logistic/conditional logistic RSF (used vs available).
 
@@ -109,7 +229,7 @@ ALSO, we need to control for the obs effort (some years field team would go more
 
 -   If you want multi-year matching (landcover year of den use), pick the dataset year accordingly (Copernicus 2019 / WorldCover 2020 / MODIS yearly).
 
-## 1.1. RSF model
+## 2.1. RSF model
 
 I will separate the Talek points with the triangle ones, so that I can make a model with the Talek town borders as a variable.
 
@@ -126,7 +246,7 @@ brm_RSF <- brms::brm(case ~ landcover + (1|year) + (1|clan),
 
 ```
 
-## 1.2. Distance to Talek model
+## 2.2. Distance to Talek model
 
 ```{r brms talek model}
 CD_RSF_data_tl <- RandomPointsCD_data |>
@@ -149,4 +269,4 @@ summary(brm_RSF_tl)
 plot(conditional_effects(brm_RSF_tl), points = T)
 ```
 
-# 2. Lion RSF
+# 3. Lion RSF
