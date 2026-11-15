@@ -169,8 +169,10 @@ Boxplot_talek <- RandomPointsCD_data |>
        x = "") +
   theme(text = element_text(size = 15))  
 Boxplot_talek
+```
 
 
+```{r}
 # ggplot:
 Boxplot_serena <- RandomPointsCD_data |>
   filter(region == "serena") |>
@@ -272,6 +274,8 @@ plot_model(talek_lm_rsf)
 tab_model(talek_lm_rsf)
 ```
 
+
+***************
 ```{r}
 library(ggeffects)
 
