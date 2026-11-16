@@ -250,23 +250,12 @@ Quick tips for RSF modelling
 ## 3.1. RSF model
 
 
-### brms
+
 Will first do the distance to border for Talek dens
 ```{r}
 Data_talek$year <- as.double(Data_talek$year)
 ```
 
-
-```{r talek model}
-Talek_RSF1 <- brm(case ~ scale(dist_br) + (1|year),
-                  data = Data_talek, 
-                  family = bernoulli(),
-                  cores = 4, 
-                  chains = 4)
-
-summary(Talek_RSF1)
-conditional_effects(Talek_RSF1)
-```
 
 
 ### lme4
@@ -281,33 +270,54 @@ tab_model(talek_rsf)
 ```
 
 ```{r}
-ggpredict(talek_rsf, terms = "dist_br") |> 
+result_plot <- 
+  ggpredict(talek_rsf, terms = "dist_br [all]") |> 
   plot()
+result_plot
 ```
+
+The result of the model quantify the relative intensity of use of a location in category j relative to locations in a reference category, assuming both are equally available.
+
+So the coefficients estimated by the model represent a coefficient of relative selection.
+
+Based on the model above, it would be a selective coefficient of 0.5
+
+
+
 
 
 ```{r rsf with lme4}
 talek_rsf2 <- glmer(case ~ scale(dist_br) + (1|year), 
-                      family = "binomial", 
-                      data = Data_talek)
+                    family = "binomial", 
+                    data = Data_talek)
 summary(talek_rsf2)
 tab_model(talek_rsf2)
 ```
 
 ```{r}
-ggpredict(talek_rsf2, terms = "dist_br") |> 
+result_plot2 <- 
+  ggpredict(talek_rsf2, terms = "dist_br") |> 
   plot()
+result_plot2
+```
+
+```{r}
+AIC(talek_rsf, talek_rsf2)
 ```
 
 
+### brms
 
+```{r talek model}
+Talek_RSF_B <- brm(case ~ scale(dist_br) + (1|year),
+                  data = Data_talek, 
+                  family = bernoulli(),
+                  cores = 4, 
+                  chains = 4)
 
-
-
-
-
-
-
+summary(Talek_RSF1)
+conditional_effects(Talek_RSF1)
+```
 
 
 
