@@ -323,18 +323,16 @@ conditional_effects(Talek_RSF1)
 Talek_RSF_B2 <- brm(case ~ scale(dist_br) + landcvr + (1|year),
                     data = Data_talek, 
                     family = bernoulli(),
+                    iter = 8000,
+                    warmup = 4000,
+                    control = list(adapt_delta = 0.99),
                     cores = 4, 
                     chains = 4)
+
 summary(Talek_RSF_B2)
 conditional_effects(Talek_RSF_B2)
 ```
 
-```{r}
-# Point temp directories to Documents (usually allowed)
-tmpdir <- "C:/Users/Anne Ju Laberge/Documents/R/tmp"
-dir.create(tmpdir, recursive = TRUE, showWarnings = FALSE)
-Sys.setenv(TMPDIR = tmpdir, TMP = tmpdir, TEMP = tmpdir)
-```
 
 
 
