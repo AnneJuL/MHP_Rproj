@@ -257,7 +257,6 @@ Data_talek$year <- as.double(Data_talek$year)
 ```
 
 
-
 ### lme4
 
 ```{r}
@@ -270,6 +269,7 @@ tab_model(talek_rsf)
 ```
 
 ```{r}
+# ylab = "Relative selection strength"
 result_plot <- 
   ggpredict(talek_rsf, terms = "dist_br [all]") |> 
   plot()
@@ -281,8 +281,6 @@ The result of the model quantify the relative intensity of use of a location in 
 So the coefficients estimated by the model represent a coefficient of relative selection.
 
 Based on the model above, it would be a selective coefficient of 0.5
-
-
 
 
 
@@ -321,29 +319,25 @@ conditional_effects(Talek_RSF1)
 
 
 
-
-## 3.2. Distance to Talek model
-
 ```{r}
-CD_RSF_data_tl <- RandomPointsCD_data |>
-  filter(clan == "talek")
-
-
-brm_RSF_tl <- brm(case ~ dst_tl + year + (1|year),
-                  data = CD_RSF_data_tl, 
-                  family = bernoulli(),
-                  cores = 4, 
-                  chains = 4)
-
-brm_RSF_tl <- readRDS("brms_models/brm_RSF_tl.rds")
-
+Talek_RSF_B2 <- brm(case ~ scale(dist_br) + landcvr + (1|year),
+                    data = Data_talek, 
+                    family = bernoulli(),
+                    cores = 4, 
+                    chains = 4)
+summary(Talek_RSF_B2)
+conditional_effects(Talek_RSF_B2)
 ```
 
 ```{r}
-
-summary(brm_RSF_tl)
-plot(conditional_effects(brm_RSF_tl), points = T)
+# Point temp directories to Documents (usually allowed)
+tmpdir <- "C:/Users/Anne Ju Laberge/Documents/R/tmp"
+dir.create(tmpdir, recursive = TRUE, showWarnings = FALSE)
+Sys.setenv(TMPDIR = tmpdir, TMP = tmpdir, TEMP = tmpdir)
 ```
+
+
+
 
 
 
