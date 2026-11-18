@@ -96,6 +96,7 @@ DB_AllGPS_sf_wgs84 <- sf::st_read("data_files/DB_AllGPS_sf_wgs84.shp")
 RandomPointsCD_data <- sf::st_read("data_files/RandomPointsCD_data_covariables.shp")
 ```
 
+
 Now just some mild modification of the database:
 ```{r}
 RandomPointsCD_data <- RandomPointsCD_data |>
