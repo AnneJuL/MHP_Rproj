@@ -107,10 +107,47 @@ Data_serena <- RandomPointsCD_data |>
 ```
 
 
+## 1. Data simulation
+
+### 1.1. Null hypothesis
+
+-	Simulate data under your null hypothesis. Generate the same number of data points that your actual dataset has.
+
+```{r}
+
+```
 
 
+### 1.2. Alternative hypothesis
+
+-	Simulate data under your alternative hypothesis. Generate the same number of data points that your actual dataset has.
+
+```{r}
+
+```
 
 
+## 2. Model fitting
+
+-	Fit the linear model from Part 0 to your two simulated datasets and your actual data set. Report the following information for each of the three model fits:
+o	The model coefficients
+o	The p values
+o	A residual plot
+o	A plot of the data with the model fit plotted on top of it
+	Plots can be from base R or ggplot
+
+### 2.1. Simulated dataset
+
+```{r}
+
+```
+
+
+### 2.2. Raw dataset
+
+```{r}
+
+```
 
 
 
