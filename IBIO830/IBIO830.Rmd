@@ -92,6 +92,20 @@ RandomPointsCD_data <- RandomPointsCD_data |>
   rename(dist_br = dst_br_, dist_wt = dst_wt_, dist_tl = dst_tl, landmark = lndmrk_)
 ```
 
+Now I'll create some sub-dataset for each region created above.
+
+Talek
+```{r}
+Data_talek <- RandomPointsCD_data |>
+  filter(region == "talek")
+```
+
+Serena
+```{r}
+Data_serena <- RandomPointsCD_data |>
+  filter(region == "serena")
+```
+
 
 
 
